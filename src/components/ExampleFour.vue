@@ -28,7 +28,9 @@ const selectedItem = ref(null)
 const draggableProductList = ref([])
 
 function addProduct(productItem) {
-  draggableProductList.value.push(productItem)
+  const copyProduct = JSON.parse(JSON.stringify(productItem))
+  copyProduct.position = draggableProductList.value.length
+  draggableProductList.value.push(copyProduct)
 }
 
 
@@ -51,16 +53,16 @@ function onDragLeave() {
 function onDragOver(event, currentItem, index) {
   const dragged = selectedItem.value
   const target = event.currentTarget
-  const draggableList = draggableProductList.value
   if (dragged === target) return
 
   if (dragged.contains(target)) return
 
   if (isBefore(dragged, target)) {
-    currentItem.changed = true
+    console.log(index)
+    currentItem.position = index
     target.parentNode.insertBefore(dragged, target)
   } else {
-    currentItem.changed = true
+    currentItem.position = index
     target.parentNode.insertBefore(dragged, target.nextSibling)
   }
 }
@@ -125,7 +127,7 @@ function onDragEnter() {
                 @dragover="onDragOver($event, draggableProduct, index)"
               >
                 <v-img :src="draggableProduct.previewUrl" />
-                <span class="text-white">{{draggableProduct.changed ? 'DEU BOM CARALHO' : 'NOPES'}}</span>
+                <span class="text-white text-subtitle-1">{{ draggableProduct.position }}</span>
               </v-col>
 
             </template>
