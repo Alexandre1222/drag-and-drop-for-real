@@ -9,6 +9,5 @@
 </template>
 
 <script setup>
-import ExampleTwo from "@/components/ExampleTwo.vue";
 import ExampleFour from "@/components/ExampleFour.vue";
 </script>
