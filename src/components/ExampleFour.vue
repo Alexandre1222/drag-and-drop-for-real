@@ -27,14 +27,9 @@ const productList = ref([
     "depth": 60
   },
 ])
-
-const productOne = ref(JSON.parse(JSON.stringify(productList.value)))
-const productTwo = ref(JSON.parse(JSON.stringify(productList.value)))
-
-const draggedSku = ref(null)
 const draggedItem = ref(null)
-const draggableProductList = ref([])
-const shelf = ref([{height: 200, products: []}, {height: 200, products: []}])
+const draggedItemIndex = ref(null)
+const shelf = ref([{height: 200, products: []}])
 const shelfHeight = ref(null)
 
 function addProduct(productItem) {
@@ -43,49 +38,38 @@ function addProduct(productItem) {
   shelf.value[0].products.push(copyProduct)
 }
 
-
-// function onDragStart(item) {
-//   console.log(item)
-//   draggedSku.value = item.sku
-// }
-
-function onDragEnter(index) {
-  if (draggedSku.value === null) return
-  moveItem(shelf.value[0].products, draggedSku.value, index)
-}
-
-function onDragEnd() {
-  draggedSku.value = null
-}
-
-function moveItem(list, draggedId, toIndex) {
-  const fromIndex = list.findIndex(i => i.sku === draggedId)
-  if (fromIndex === -1 || fromIndex === toIndex) return
-
-  const [item] = list.splice(fromIndex, 1)
-  list.splice(toIndex, 0, item)
-
-  list.forEach((item, index) => {
-    item.position = index
-  })
-}
-
 function addShelf() {
-  shelf.value.push({height: shelfHeight.value, products: []})
+  shelf.value.push({height: shelfHeight.value, products: [productList.value[1]]})
   shelfHeight.value = null
 }
 
-function onDragStart(event, item) {
+function onDragStart(event, item, shelfItemIndex) {
+  console.log("Arrastando o item: ", item, shelfItemIndex)
   draggedItem.value = item
+  draggedItemIndex.value = shelfItemIndex
 }
 
-function onDrop(targetList, list) {
-  if (!draggedItem.value) return
-
-  // adiciona na lista alvo
-  list.push(draggedItem.value)
-  console.log(list)
+function onDrop(event, currentShelf, currentShelfIndex){
+  if (currentShelfIndex == draggedItemIndex.value){
+    draggedItem.value = null
+    draggedItemIndex.value = null
+    return
+  }
+  currentShelf.products.push(draggedItem.value)
   draggedItem.value = null
+  draggedItemIndex.value = null
+}
+
+function swapItems(list, from, to) {
+  const temp = list[from]
+  list[from] = list[to]
+  list[to] = temp
+}
+
+function onDragEnter(index, itemIndex) {
+  if (draggedItem.value === null) return
+
+  swapItems(shelf.value[index].products, itemIndex, index)
 }
 </script>
 
@@ -130,19 +114,20 @@ function onDrop(targetList, list) {
       <v-col cols="8">
         <v-card>
           <v-row>
-            <v-col cols="12" class="bg-purple-accent-1 ma-2">
+            <v-col cols="12">
               <template v-for="(shelfItem, index) in shelf">
-                <template v-for="imageItem in shelfItem.products">
-                  <v-img
-                    draggable="true"
-                    @dragstart="onDragStart($event, imageItem)"
-                    :src="imageItem.previewUrl"
-                    :height="imageItem.height + 'px'"
-                    :width="imageItem.width + 'px'"
-                    class="ma-1"
-                    contain
-                  />
-                </template>
+                <v-row class="bg-purple-accent-1 ma-2" @drop="onDrop($event, shelfItem, index)" @dragover.prevent>
+                    <v-col cols="2" class="pa-0 ma-0" align-self="end" v-for="(imageItem, itemIndex) in shelfItem.products">
+                      <v-img
+                        draggable="true"
+                        @dragstart="onDragStart($event, imageItem, index)"
+                        @dragenter.prevent="onDragEnter(index, itemIndex)"
+                        :src="imageItem.previewUrl"
+                        :height="imageItem.height + 'px'"
+                        :width="imageItem.width + 'px'"
+                      />
+                    </v-col>
+                </v-row>
               </template>
             </v-col>
           </v-row>
