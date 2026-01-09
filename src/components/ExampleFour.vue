@@ -1,6 +1,7 @@
 <script setup>
 import {ref} from "vue";
-
+import AddProductDialog from "@/components/dialog/addProductDialog.vue";
+const addProductModel = ref(false)
 const productList = ref([
   {
     "title": "Maionese Heinz 390g",
@@ -27,10 +28,17 @@ const productList = ref([
     "depth": 60
   },
 ])
-const draggedItem = ref(null)
-const draggedItemIndex = ref(null)
 const shelf = ref([{height: 200, products: []}])
 const shelfHeight = ref(null)
+const draggedItem = ref(null)
+const draggedItemIndex = ref(null)
+const draggedShelfIndex = ref(null)
+let targetIndex = null
+let targetShelfName = null
+
+function saveProduct(product){
+  productList.value.push(product)
+}
 
 function addProduct(productItem) {
   const copyProduct = JSON.parse(JSON.stringify(productItem))
@@ -43,34 +51,43 @@ function addShelf() {
   shelfHeight.value = null
 }
 
-function onDragStart(event, item, shelfItemIndex) {
-  console.log("Arrastando o item: ", item, shelfItemIndex)
+function onDragStart(item, itemIndex, shelfIndex) {
   draggedItem.value = item
-  draggedItemIndex.value = shelfItemIndex
+  draggedItemIndex.value = itemIndex
+  draggedItemIndex.value = itemIndex
+  draggedShelfIndex.value = shelfIndex
 }
 
-function onDrop(event, currentShelf, currentShelfIndex){
-  if (currentShelfIndex == draggedItemIndex.value){
-    draggedItem.value = null
-    draggedItemIndex.value = null
-    return
-  }
-  currentShelf.products.push(draggedItem.value)
+function onDragEnd() {
   draggedItem.value = null
   draggedItemIndex.value = null
+  draggedShelfIndex.value = null
+  targetIndex = null
+  targetShelfName = null
 }
 
-function swapItems(list, from, to) {
-  const temp = list[from]
-  list[from] = list[to]
-  list[to] = temp
+function onDrop(index, dropIndex) {
+  if (!draggedItem.value) return
+  const sourceShelf = shelf.value[draggedShelfIndex.value]
+  const destShelf = shelf.value[index]
+  let insertIndex = dropIndex
+
+  const removedItem = sourceShelf.products.splice(draggedItemIndex.value, 1)[0]
+
+  if (draggedShelfIndex.value === index && draggedItemIndex.value < dropIndex) {
+    insertIndex--
+  }
+
+  destShelf.products.splice(insertIndex, 0, removedItem)
+  destShelf.products.forEach((item, i) => {
+    item.position = i
+  })
+  if (draggedShelfIndex.value === index) {
+    sourceShelf.products.forEach((item, i) => (item.position = i))
+  }
+  onDragEnd()
 }
 
-function onDragEnter(index, itemIndex) {
-  if (draggedItem.value === null) return
-
-  swapItems(shelf.value[index].products, itemIndex, index)
-}
 </script>
 
 <template>
@@ -109,6 +126,7 @@ function onDragEnter(index, itemIndex) {
               </template>
             </v-list-item>
           </v-list>
+          <v-btn block prepend-icon="mdi-plus" color="success" @click.stop="addProductModel = true">Adicionar produto</v-btn>
         </v-card>
       </v-col>
       <v-col cols="8">
@@ -116,12 +134,14 @@ function onDragEnter(index, itemIndex) {
           <v-row>
             <v-col cols="12">
               <template v-for="(shelfItem, index) in shelf">
-                <v-row class="bg-purple-accent-1 ma-2" @drop="onDrop($event, shelfItem, index)" @dragover.prevent>
+                <v-row class="bg-purple-accent-1 ma-2" @drop="onDrop(index, index)" @dragover.prevent
+                       :style="{'min-height': shelfItem.height + 'px'}">
                     <v-col cols="2" class="pa-0 ma-0" align-self="end" v-for="(imageItem, itemIndex) in shelfItem.products">
                       <v-img
                         draggable="true"
-                        @dragstart="onDragStart($event, imageItem, index)"
-                        @dragenter.prevent="onDragEnter(index, itemIndex)"
+                        @dragstart="onDragStart(shelfItem, itemIndex, index)"
+                        @dragend="onDragEnd"
+                        @drop="onDrop(index, itemIndex)"
                         :src="imageItem.previewUrl"
                         :height="imageItem.height + 'px'"
                         :width="imageItem.width + 'px'"
@@ -136,6 +156,7 @@ function onDragEnter(index, itemIndex) {
     </v-row>
   </v-container>
 
+  <add-product-dialog v-model="addProductModel" @save-product="saveProduct"/>
 </template>
 
 <style scoped>
