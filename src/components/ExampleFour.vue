@@ -41,6 +41,16 @@ const draggedShelfIndex = ref(null)
 let targetIndex = null
 let targetShelfName = null
 
+const snackbar = ref(false);
+const snackbarText = ref("");
+const snackbarColor = ref("error");
+
+function showFeedback(msg, color = 'error') {
+  snackbarText.value = msg;
+  snackbarColor.value = color;
+  snackbar.value = true;
+}
+
 function saveProduct(product){
   productList.value.push(product)
 }
@@ -52,8 +62,24 @@ function addProduct(productItem) {
 }
 
 function addShelf() {
-  shelf.value.push({height: shelfHeight.value, products: [productList.value[1]]})
-  shelfHeight.value = null
+  if (!shelfHeight.value) return;
+  const newHeight = Number(shelfHeight.value);
+  const actualHeightTotal = shelf.value.reduce((acc, item) => acc + item.height, 0);
+  if (actualHeightTotal + newHeight > standSize.value.height) {
+    if (standSize.value.height - actualHeightTotal === 0){
+      showFeedback(`Não cabe! Esquece fi, ja gastou todo o espaço`)
+      return
+    }
+    showFeedback(`Não cabe! Espaço disponível: ${standSize.value.height - actualHeightTotal} cm`)
+    return;
+  }
+
+  shelf.value.push({
+    height: newHeight,
+    products: []
+  });
+
+  shelfHeight.value = null;
 }
 
 function onDragStart(item, itemIndex, shelfIndex) {
@@ -95,10 +121,32 @@ function onDrop(index, dropIndex) {
 </script>
 
 <template>
+  <v-snackbar
+    v-model="snackbar"
+    location="top right"
+    :color="snackbarColor"
+    timeout="3000"
+    variant="elevated"
+  >
+    <div class="d-flex align-center">
+      <v-icon icon="mdi-alert-circle-outline" class="mr-2"></v-icon>
+      {{ snackbarText }}
+    </div>
+
+    <template v-slot:actions>
+      <v-btn
+        color="white"
+        variant="text"
+        @click="snackbar = false"
+      >
+        Fechar
+      </v-btn>
+    </template>
+  </v-snackbar>
   <v-container>
     <v-row>
       <v-col cols="6">
-        <v-number-input label="Altura" variant="outlined" bg-color="white" density="compact" v-model="shelfHeight"/>
+        <v-number-input label="Altura (CM)" variant="outlined" color="white" v-model="shelfHeight"/>
       </v-col>
       <v-col cols="6">
         <v-btn :color="shelfHeight? 'primary' : 'error'" @click.stop="addShelf" :disabled="!shelfHeight">Adicionar
