@@ -2,6 +2,7 @@
 import {onMounted, ref} from "vue";
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
 import cmToPixel from "@/plugins/helper/cmToPixel.js";
+
 const addProductModel = ref(false)
 const productList = ref([
   {
@@ -9,7 +10,7 @@ const productList = ref([
     "previewUrl": "https://phygital-files.mercafacil.com/comercial-big-oferta/uploads/produto/heinz_maionese_390g_1684dc84-5ab9-4d35-a4f6-db95408160ee.png",
     "sku": "19194518234",
     "height": 16.9,
-    "width": 8,
+    "width": 10,
     "depth": 5.5
   },
   {
@@ -30,8 +31,8 @@ const productList = ref([
   },
 ])
 const standSize = ref({
-  height: 170,
-  width: 285
+  height: 160,
+  width: 92
 })
 const shelf = ref([])
 const shelfHeight = ref(null)
@@ -51,7 +52,7 @@ function showFeedback(msg, color = 'error') {
   snackbar.value = true;
 }
 
-function saveProduct(product){
+function saveProduct(product) {
   productList.value.push(product)
 }
 
@@ -66,7 +67,7 @@ function addShelf() {
   const newHeight = Number(shelfHeight.value);
   const actualHeightTotal = shelf.value.reduce((acc, item) => acc + item.height, 0);
   if (actualHeightTotal + newHeight > standSize.value.height) {
-    if (standSize.value.height - actualHeightTotal === 0){
+    if (standSize.value.height - actualHeightTotal === 0) {
       showFeedback(`Não cabe! Esquece fi, ja gastou todo o espaço`)
       return
     }
@@ -101,6 +102,11 @@ function onDrop(index, dropIndex) {
   if (!draggedItem.value) return
   const sourceShelf = shelf.value[draggedShelfIndex.value]
   const destShelf = shelf.value[index]
+
+  if (sourceShelf.products[draggedItemIndex.value].height > destShelf.height) {
+    showFeedback(`Opa maninho, o produto tem ${sourceShelf.products[draggedItemIndex.value].height}cm de altura  e a estante tem ${destShelf.height}cm, não rola né`)
+    return
+  }
   let insertIndex = dropIndex
 
   const removedItem = sourceShelf.products.splice(draggedItemIndex.value, 1)[0]
@@ -146,15 +152,24 @@ function onDrop(index, dropIndex) {
   <v-container>
     <v-row>
       <v-col cols="6">
-        <v-number-input label="Altura (CM)" variant="outlined" color="white" v-model="shelfHeight"/>
+        <v-number-input :precision="2" label="Altura (CM)" variant="outlined" color="white" v-model="shelfHeight"/>
       </v-col>
       <v-col cols="6">
         <v-btn :color="shelfHeight? 'primary' : 'error'" @click.stop="addShelf" :disabled="!shelfHeight">Adicionar
           Prateleira
         </v-btn>
       </v-col>
+      <v-col cols="12">
+        <v-banner
+          avatar="https://m.media-amazon.com/images/I/51CGhVom7HL._AC_UF1000,1000_QL80_.jpg"
+          color="success"
+          :text="`A altura pré definida da estante é de ${standSize.height}x${standSize.width} (medida em centimetros)`"
+          :stacked="false"
+        >
+        </v-banner>
+      </v-col>
       <v-col cols="4" class="h-100">
-        <v-card color="white">
+        <v-card color="white" :disabled="shelf.length === 0">
           <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o produto" single-line
                         prepend-inner-icon="mdi-magnify" hide-details/>
           <v-list lines="one" bg-color="transparent">
@@ -178,20 +193,19 @@ function onDrop(index, dropIndex) {
               </template>
             </v-list-item>
           </v-list>
-          <v-btn block prepend-icon="mdi-plus" color="success" @click.stop="addProductModel = true">Adicionar produto</v-btn>
+          <v-btn block prepend-icon="mdi-plus" color="success" @click.stop="addProductModel = true">Adicionar produto
+          </v-btn>
         </v-card>
       </v-col>
-      <v-col cols="8">
-        <v-card class="polka-dot overflow-x-scroll overflow-y-auto w-100 h-100 pa-0" :style="{
-    width: cmToPixel(null, standSize.width).widthPx + 'px',
-    height: cmToPixel(standSize.height, null).heightPx + 'px'
-  }">
-          <v-row>
-            <v-col cols="12" class="pa-0">
-              <template v-for="(shelfItem, index) in shelf">
-                <v-row no-gutters class="flex-nowrap droppable-area" @drop="onDrop(index, index)" @dragover.prevent
-                       :style="{'min-height': shelfItem.height + 'px'}" >
-                    <v-col cols="auto" class="pa-0 ma-0" align-self="end" v-for="(imageItem, itemIndex) in shelfItem.products">
+      <v-col cols="8" class="overflow-x-auto">
+        <v-card class="polka-dot pa-0 ma-0">
+          <v-card-item class="pa-0">
+            <v-row>
+              <v-col cols="12" class="py-0">
+                <template v-for="(shelfItem, index) in shelf">
+                  <v-row no-gutters class="flex-nowrap droppable-area" @drop="onDrop(index, index)" @dragover.prevent
+                         :style="{'min-height': cmToPixel(shelfItem.height, null).heightPx + 'px'}">
+                    <v-col cols="auto" align-self="end" v-for="(imageItem, itemIndex) in shelfItem.products">
                       <v-img
                         draggable="true"
                         @dragstart="onDragStart(shelfItem, itemIndex, index)"
@@ -202,11 +216,12 @@ function onDrop(index, dropIndex) {
                         :width="cmToPixel(imageItem.height, imageItem.width).widthPx"
                       />
                     </v-col>
-                </v-row>
-                <v-divider thickness="6" color="black" variant="solid" class="border-opacity-100"/>
-              </template>
-            </v-col>
-          </v-row>
+                  </v-row>
+                  <v-divider thickness="5" color="black" variant="solid" class="border-opacity-100"/>
+                </template>
+              </v-col>
+            </v-row>
+          </v-card-item>
         </v-card>
       </v-col>
     </v-row>
@@ -217,15 +232,32 @@ function onDrop(index, dropIndex) {
 
 <style scoped>
 .polka-dot {
-  padding: 0;
-  margin: 0;
+  position: relative;
   background-color: #fcfcfd;
-  background-image: radial-gradient(
-    #dfdfe4 2px,
-  transparent 2px
-  );
+  background-image: radial-gradient(#dfdfe4 2px, transparent 2px);
   background-size: 15px 15px;
 }
+
+.polka-dot::before {
+  content: "Alê Property";
+  position: absolute;
+  inset: 0;
+  font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
+  font-size: 40px;
+  font-weight: bold;
+  color: rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.polka-dot > * {
+  position: relative;
+  z-index: 1;
+}
+
 .droppable-area {
   background-color: rgba(0, 0, 0, 0.3);
 }
