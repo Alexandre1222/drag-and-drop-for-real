@@ -22,15 +22,18 @@ const productList = ref([
   },
   {
     "title": "Mobil Super 20W50",
-    "previewUrl": "https://moovelub.com/mobil/storage/uploads/00000000139.png?v=1723689740035",
+    "previewUrl": "https://pngfre.com/wp-content/uploads/Monster-24-300x300.png",
     "sku": "8951428573583",
-    "height": 25,
-    "width": 9,
+    "height": 15.7,
+    "width": 6.5,
     "depth": 7
   },
 ])
-
-const shelf = ref([{height: 200, products: []}])
+const standSize = ref({
+  height: 170,
+  width: 285
+})
+const shelf = ref([])
 const shelfHeight = ref(null)
 const draggedItem = ref(null)
 const draggedItemIndex = ref(null)
@@ -131,11 +134,14 @@ function onDrop(index, dropIndex) {
         </v-card>
       </v-col>
       <v-col cols="8">
-        <v-card class="polka-dot">
-          <v-row >
-            <v-col cols="12" style="height: 750px">
+        <v-card class="polka-dot overflow-x-scroll overflow-y-auto w-100 h-100 pa-0" :style="{
+    width: cmToPixel(null, standSize.width).widthPx + 'px',
+    height: cmToPixel(standSize.height, null).heightPx + 'px'
+  }">
+          <v-row>
+            <v-col cols="12" class="pa-0">
               <template v-for="(shelfItem, index) in shelf">
-                <v-row class="my-2 flex-nowrap" @drop="onDrop(index, index)" @dragover.prevent
+                <v-row no-gutters class="flex-nowrap droppable-area" @drop="onDrop(index, index)" @dragover.prevent
                        :style="{'min-height': shelfItem.height + 'px'}" >
                     <v-col cols="auto" class="pa-0 ma-0" align-self="end" v-for="(imageItem, itemIndex) in shelfItem.products">
                       <v-img
@@ -171,5 +177,8 @@ function onDrop(index, dropIndex) {
   transparent 2px
   );
   background-size: 15px 15px;
+}
+.droppable-area {
+  background-color: rgba(0, 0, 0, 0.3);
 }
 </style>

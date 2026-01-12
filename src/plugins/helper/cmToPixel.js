@@ -1,14 +1,19 @@
-function cmToPixel(height, width) {
-  const MAX_PX = 180 // tamanho máximo visual (caixa imaginária)
+function cmToPixel(alturaCm, larguraCm) {
+  const PIXELS_POR_CM = 6;
 
-  // usa o maior lado real como referência
-  const maxRealSide = Math.max(height, width)
+  const MAX_HEIGHT_PX = 400;
 
-  const scale = MAX_PX / maxRealSide
+  let alturaFinal = alturaCm * PIXELS_POR_CM;
+  let larguraFinal = larguraCm * PIXELS_POR_CM;
 
-  return {
-    heightPx: Math.round(height * scale),
-    widthPx: Math.round(width * scale)
+  if (alturaFinal > MAX_HEIGHT_PX) {
+    const razaoReducao = MAX_HEIGHT_PX / alturaFinal;
+    alturaFinal = MAX_HEIGHT_PX;
+    larguraFinal = larguraFinal * razaoReducao;
   }
+  return {
+    heightPx: Math.round(alturaFinal),
+    widthPx: Math.round(larguraFinal)
+  };
 }
 export default cmToPixel
