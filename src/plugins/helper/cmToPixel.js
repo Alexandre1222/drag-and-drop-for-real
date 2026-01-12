@@ -1,5 +1,5 @@
 function cmToPixel(alturaCm, larguraCm) {
-  const PIXELS_POR_CM = 6;
+  const PIXELS_POR_CM = 8;
 
   const MAX_HEIGHT_PX = 400;
 
