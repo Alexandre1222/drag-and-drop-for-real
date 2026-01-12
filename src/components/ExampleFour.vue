@@ -1,33 +1,35 @@
 <script setup>
-import {ref} from "vue";
+import {onMounted, ref} from "vue";
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
+import cmToPixel from "@/plugins/helper/cmToPixel.js";
 const addProductModel = ref(false)
 const productList = ref([
   {
     "title": "Maionese Heinz 390g",
     "previewUrl": "https://phygital-files.mercafacil.com/comercial-big-oferta/uploads/produto/heinz_maionese_390g_1684dc84-5ab9-4d35-a4f6-db95408160ee.png",
     "sku": "19194518234",
-    "height": 190,
-    "width": 70,
-    "depth": 70
+    "height": 16.9,
+    "width": 8,
+    "depth": 5.5
   },
   {
     "title": "Ketchup Cepera 400g",
     "previewUrl": "https://phygital-files.mercafacil.com/primato/uploads/produto/ketchup_cepera_400g_tradicional_6f642c91-029c-4976-a93d-4d81393e9ca8.png",
     "sku": "8951428573583",
-    "height": 200,
-    "width": 60,
-    "depth": 60
+    "height": 15,
+    "width": 8,
+    "depth": 5.5
   },
   {
     "title": "Mobil Super 20W50",
     "previewUrl": "https://moovelub.com/mobil/storage/uploads/00000000139.png?v=1723689740035",
     "sku": "8951428573583",
-    "height": 250,
-    "width": 100,
-    "depth": 60
+    "height": 25,
+    "width": 9,
+    "depth": 7
   },
 ])
+
 const shelf = ref([{height: 200, products: []}])
 const shelfHeight = ref(null)
 const draggedItem = ref(null)
@@ -87,7 +89,6 @@ function onDrop(index, dropIndex) {
   }
   onDragEnd()
 }
-
 </script>
 
 <template>
@@ -130,24 +131,25 @@ function onDrop(index, dropIndex) {
         </v-card>
       </v-col>
       <v-col cols="8">
-        <v-card>
-          <v-row>
-            <v-col cols="12">
+        <v-card class="polka-dot">
+          <v-row >
+            <v-col cols="12" style="height: 750px">
               <template v-for="(shelfItem, index) in shelf">
-                <v-row class="bg-purple-accent-1 ma-2" @drop="onDrop(index, index)" @dragover.prevent
-                       :style="{'min-height': shelfItem.height + 'px'}">
-                    <v-col cols="2" class="pa-0 ma-0" align-self="end" v-for="(imageItem, itemIndex) in shelfItem.products">
+                <v-row class="my-2 flex-nowrap" @drop="onDrop(index, index)" @dragover.prevent
+                       :style="{'min-height': shelfItem.height + 'px'}" >
+                    <v-col cols="auto" class="pa-0 ma-0" align-self="end" v-for="(imageItem, itemIndex) in shelfItem.products">
                       <v-img
                         draggable="true"
                         @dragstart="onDragStart(shelfItem, itemIndex, index)"
                         @dragend="onDragEnd"
                         @drop="onDrop(index, itemIndex)"
                         :src="imageItem.previewUrl"
-                        :height="imageItem.height + 'px'"
-                        :width="imageItem.width + 'px'"
+                        :height="cmToPixel(imageItem.height, imageItem.width).heightPx"
+                        :width="cmToPixel(imageItem.height, imageItem.width).widthPx"
                       />
                     </v-col>
                 </v-row>
+                <v-divider thickness="6" color="black" variant="solid" class="border-opacity-100"/>
               </template>
             </v-col>
           </v-row>
@@ -160,11 +162,14 @@ function onDrop(index, dropIndex) {
 </template>
 
 <style scoped>
-.drag-over {
-  background-color: #42b883;
-}
-
-.drag-el {
-  color: white;
+.polka-dot {
+  padding: 0;
+  margin: 0;
+  background-color: #fcfcfd;
+  background-image: radial-gradient(
+    #dfdfe4 2px,
+  transparent 2px
+  );
+  background-size: 15px 15px;
 }
 </style>
