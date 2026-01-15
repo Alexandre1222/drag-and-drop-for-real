@@ -3,6 +3,24 @@ import {onMounted, ref} from "vue";
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
 import cmToPixel from "@/plugins/helper/cmToPixel.js";
 
+const menu = ref(false)
+const menuTarget = ref(null)
+const indexProductToDelete = ref(null)
+const indexShelfToDelete = ref(null)
+
+function openMenu(index, shelfIndex, event) {
+  indexShelfToDelete.value = shelfIndex
+  indexProductToDelete.value = index
+  menuTarget.value = event.target.closest('.v-img')
+  menu.value = true
+}
+
+function action() {
+  console.log(shelf.value[indexShelfToDelete.value].products[indexProductToDelete.value])
+  shelf.value[indexShelfToDelete.value].products.splice(indexProductToDelete.value, 1)
+  menu.value = false
+}
+
 const addProductModel = ref(false)
 const productList = ref([
   {
@@ -60,7 +78,23 @@ function saveProduct(product) {
   productList.value.push(product)
 }
 
+function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
+  console.log(currentShelfProducts, currentShelfWidth, productWidth)
+  let widthAcummulated = 0
+  for (const currentShelfProduct of currentShelfProducts) {
+    widthAcummulated += currentShelfProduct.width
+  }
+  console.log(`Tenho ${(productWidth + widthAcummulated)} acumulado e nao pode ser maior que ${currentShelfWidth}`)
+  return (productWidth + widthAcummulated) > currentShelfWidth;
+
+}
+
 function addProduct(productItem) {
+  const currentProductWidth = productItem.width
+  if (canAddProduct(shelf.value[0].products, standSize.value.width, currentProductWidth)) {
+    showFeedback(`Limite atingido não é possivel adicionar mais produtos`)
+    return
+  }
   const copyProduct = JSON.parse(JSON.stringify(productItem))
   copyProduct.position = shelf.value[0].products.length
   shelf.value[0].products.push(copyProduct)
@@ -93,9 +127,8 @@ function onDragStart(item, itemIndex, shelfIndex, event) {
   draggedItemIndex.value = itemIndex
   draggedShelfIndex.value = shelfIndex
   const rect = event.target.getBoundingClientRect();
-  console.log(rect)
-  draggedItem.value.offsetX = event.clientX - rect.left;
   draggedItem.value.offsetY = event.clientY - rect.top;
+  draggedItem.value.offsetX = event.clientX - rect.left;
 }
 
 function onDragEnd() {
@@ -104,7 +137,7 @@ function onDragEnd() {
   draggedShelfIndex.value = null
 }
 
-function onDrop(index, dropIndex, event, state) {
+function onDrop(index, event) {
   if (!draggedItem.value) return
   const sourceShelf = shelf.value[draggedShelfIndex.value]
   const destShelf = shelf.value[index]
@@ -113,19 +146,30 @@ function onDrop(index, dropIndex, event, state) {
     showFeedback(`Opa maninho, o produto tem ${sourceShelf.products[draggedItemIndex.value].height}cm de altura  e a estante tem ${destShelf.height}cm, não rola né`)
     return
   }
-  let insertIndex = dropIndex
 
-  const containerRect = event.currentTarget.getBoundingClientRect();
+  let insertIndex = index
+  const container = event.currentTarget;
+  const item = event.target;
+
+  const containerRect = container.getBoundingClientRect();
+  const itemRect = item.getBoundingClientRect();
+
+  const productsCopy = [...sourceShelf.products];
+
+  const removedItem = productsCopy.splice(draggedItemIndex.value, 1)[0];
+  if (draggedShelfIndex.value !== index && canAddProduct(shelf.value[index].products, standSize.value.width, removedItem.width)) {
+    showFeedback(`Limite atingido não é possivel adicionar mais produtos`)
+    return
+  }
+  sourceShelf.products.splice(draggedItemIndex.value, 1);
 
   const newX = event.clientX - containerRect.left - draggedItem.value.offsetX;
   const newY = event.clientY - containerRect.top - draggedItem.value.offsetY;
-  const itemHeight = draggedItem.value.offsetY;
-  const removedItem = sourceShelf.products.splice(draggedItemIndex.value, 1)[0]
-  removedItem.x = newX < 0 ? 0 : newX
-  // removedItem.y = newY;
-  removedItem.y = 200;
 
-  if (draggedShelfIndex.value === index && draggedItemIndex.value < dropIndex) {
+  removedItem.x = newX < 0 ? 0 : newX
+  removedItem.y = newY;
+
+  if (draggedShelfIndex.value === index && draggedItemIndex.value < index) {
     insertIndex--
   }
 
@@ -163,6 +207,7 @@ function onDrop(index, dropIndex, event, state) {
       </v-btn>
     </template>
   </v-snackbar>
+
   <v-container>
     <v-row>
       <v-col cols="6">
@@ -215,11 +260,11 @@ function onDrop(index, dropIndex, event, state) {
         <v-card class="polka-dot pa-0 ma-0">
           <v-card-item class="pa-0">
             <template v-for="(shelfItem, index) in shelf">
-              <span class="text-amber">{{ cmToPixel(shelfItem.height, null).heightPx + 'px' }}</span>
-              <div class="flex-nowrap droppable-area" @drop="onDrop(index, index, $event, 'shelf')" @dragover.prevent
+              <div class="flex-nowrap droppable-area menu-area" @contextmenu.prevent="openMenu(0, index, $event)" @drop="onDrop(index, $event, 'shelf')" @dragover.prevent
                    :style="{'min-height': cmToPixel(shelfItem.height, null).heightPx + 'px'}">
                 <div class="position-absolute" v-for="(imageItem, itemIndex) in shelfItem.products">
                   <v-img
+                    @contextmenu.prevent="openMenu(itemIndex, index, $event)"
                     class="cursor-move image-item"
                     draggable="true"
                     @dragstart="onDragStart(shelfItem, itemIndex, index, $event)"
@@ -230,10 +275,25 @@ function onDrop(index, dropIndex, event, state) {
                     :style="{top: `${imageItem.y}px`,left: `${imageItem.x}px`}"
                   >
                   </v-img>
-                  <span draggable="false">
-                          {{ cmToPixel(imageItem.height, imageItem.width).heightPx }}px/{{ cmToPixel(imageItem.height, imageItem.width).widthPx }}px <br>
-                          {{ `${imageItem.x}px` }}/{{ `${imageItem.y}px` }}
-                            </span>
+                  <v-menu
+                    v-model="menu"
+                    location="end"
+                    scroll-strategy="close"
+                    :target="menuTarget"
+                  >
+                    <v-list
+                      class="py-0"
+                      density="compact"
+                      slim
+                      nav
+                    >
+                      <v-list-item density="compact" @click="action(itemIndex, index)">
+                        <v-list-item-title>
+                          Excluir
+                        </v-list-item-title>
+                      </v-list-item>
+                    </v-list>
+                  </v-menu>
                 </div>
               </div>
               <v-divider thickness="5" color="black" variant="solid" class="border-opacity-100"/>
@@ -260,7 +320,6 @@ function onDrop(index, dropIndex, event, state) {
 }
 
 .polka-dot::before {
-  content: "Alê Property";
   position: absolute;
   inset: 0;
   font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
@@ -280,6 +339,6 @@ function onDrop(index, dropIndex, event, state) {
 }
 
 .droppable-area {
-  background-color: rgba(0, 0, 0, 0.3);
+  position: relative;
 }
 </style>
