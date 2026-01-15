@@ -4,10 +4,15 @@ import AddProductDialog from "@/components/dialog/addProductDialog.vue";
 import cmToPixel from "@/plugins/helper/cmToPixel.js";
 
 const menu = ref(false)
+const shelfMenu = ref(false)
 const menuTarget = ref(null)
+const shelfIndexToDelete = ref(null)
 const indexProductToDelete = ref(null)
 const indexShelfToDelete = ref(null)
-
+const shelfMenuPosition = ref({
+  x: 0,
+  y: 0
+})
 function openMenu(index, shelfIndex, event) {
   indexShelfToDelete.value = shelfIndex
   indexProductToDelete.value = index
@@ -19,6 +24,18 @@ function action() {
   console.log(shelf.value[indexShelfToDelete.value].products[indexProductToDelete.value])
   shelf.value[indexShelfToDelete.value].products.splice(indexProductToDelete.value, 1)
   menu.value = false
+}
+
+function openShelfMenu(shelfIndex, event) {
+  shelfMenuPosition.value.x = event.clientX
+  shelfMenuPosition.value.y = event.clientY
+  shelfIndexToDelete.value = shelfIndex
+  shelfMenu.value = true
+}
+
+function actionShelf() {
+  shelf.value.splice(shelfIndexToDelete.value, 1)
+  shelfMenu.value = false
 }
 
 const addProductModel = ref(false)
@@ -257,11 +274,33 @@ function onDrop(index, event) {
         </v-card>
       </v-col>
       <v-col cols="8" class="overflow-x-auto">
+                {{shelfMenuPosition}}
         <v-card class="polka-dot pa-0 ma-0">
           <v-card-item class="pa-0">
             <template v-for="(shelfItem, index) in shelf">
-              <div class="flex-nowrap droppable-area menu-area" @contextmenu.prevent="openMenu(0, index, $event)" @drop="onDrop(index, $event, 'shelf')" @dragover.prevent
+              <div class="flex-nowrap droppable-area menu-area" @contextmenu.prevent="openShelfMenu(index, $event)" @drop="onDrop(index, $event, 'shelf')" @dragover.prevent
                    :style="{'min-height': cmToPixel(shelfItem.height, null).heightPx + 'px'}">
+                <v-menu
+                  v-model="shelfMenu"
+                  location="end"
+                  scroll-strategy="close"
+                  :position-x="shelfMenuPosition.x"
+                  :position-y="shelfMenuPosition.y"
+                  :target="[shelfMenuPosition.x, shelfMenuPosition.y]"
+                >
+                  <v-list
+                    class="py-0"
+                    density="compact"
+                    slim
+                    nav
+                  >
+                    <v-list-item density="compact" @click="actionShelf">
+                      <v-list-item-title>
+                        Deletar Prateleira
+                      </v-list-item-title>
+                    </v-list-item>
+                  </v-list>
+                </v-menu>
                 <div class="position-absolute" v-for="(imageItem, itemIndex) in shelfItem.products">
                   <v-img
                     @contextmenu.prevent="openMenu(itemIndex, index, $event)"
