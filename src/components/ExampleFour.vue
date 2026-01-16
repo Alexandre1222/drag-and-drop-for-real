@@ -14,6 +14,9 @@ const shelfMenuPosition = ref({
   y: 0
 })
 function openMenu(index, shelfIndex, event) {
+  if (shelfMenu.value){
+    shelfMenu.value = false
+  }
   indexShelfToDelete.value = shelfIndex
   indexProductToDelete.value = index
   menuTarget.value = event.target.closest('.v-img')
@@ -21,12 +24,14 @@ function openMenu(index, shelfIndex, event) {
 }
 
 function action() {
-  console.log(shelf.value[indexShelfToDelete.value].products[indexProductToDelete.value])
   shelf.value[indexShelfToDelete.value].products.splice(indexProductToDelete.value, 1)
   menu.value = false
 }
 
 function openShelfMenu(shelfIndex, event) {
+  if (menu.value){
+    menu.value = false
+  }
   shelfMenuPosition.value.x = event.clientX
   shelfMenuPosition.value.y = event.clientY
   shelfIndexToDelete.value = shelfIndex
@@ -96,12 +101,10 @@ function saveProduct(product) {
 }
 
 function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
-  console.log(currentShelfProducts, currentShelfWidth, productWidth)
   let widthAcummulated = 0
   for (const currentShelfProduct of currentShelfProducts) {
     widthAcummulated += currentShelfProduct.width
   }
-  console.log(`Tenho ${(productWidth + widthAcummulated)} acumulado e nao pode ser maior que ${currentShelfWidth}`)
   return (productWidth + widthAcummulated) > currentShelfWidth;
 
 }
@@ -154,7 +157,7 @@ function onDragEnd() {
   draggedShelfIndex.value = null
 }
 
-function onDrop(index, event) {
+function onDrop(index, event, shelfHeight = 0) {
   if (!draggedItem.value) return
   const sourceShelf = shelf.value[draggedShelfIndex.value]
   const destShelf = shelf.value[index]
@@ -174,6 +177,7 @@ function onDrop(index, event) {
   const productsCopy = [...sourceShelf.products];
 
   const removedItem = productsCopy.splice(draggedItemIndex.value, 1)[0];
+  const removedItemHeight = cmToPixel(removedItem.height, null).heightPx
   if (draggedShelfIndex.value !== index && canAddProduct(shelf.value[index].products, standSize.value.width, removedItem.width)) {
     showFeedback(`Limite atingido não é possivel adicionar mais produtos`)
     return
@@ -184,7 +188,7 @@ function onDrop(index, event) {
   const newY = event.clientY - containerRect.top - draggedItem.value.offsetY;
 
   removedItem.x = newX < 0 ? 0 : newX
-  removedItem.y = newY;
+  removedItem.y = shelfHeight - removedItemHeight;
 
   if (draggedShelfIndex.value === index && draggedItemIndex.value < index) {
     insertIndex--
@@ -274,11 +278,10 @@ function onDrop(index, event) {
         </v-card>
       </v-col>
       <v-col cols="8" class="overflow-x-auto">
-                {{shelfMenuPosition}}
         <v-card class="polka-dot pa-0 ma-0">
           <v-card-item class="pa-0">
             <template v-for="(shelfItem, index) in shelf">
-              <div class="flex-nowrap droppable-area menu-area" @contextmenu.prevent="openShelfMenu(index, $event)" @drop="onDrop(index, $event, 'shelf')" @dragover.prevent
+              <div class="flex-nowrap droppable-area menu-area" @contextmenu.prevent.stop="openShelfMenu(index, $event)" @drop="onDrop(index, $event, cmToPixel(shelfItem.height, null).heightPx)" @dragover.prevent
                    :style="{'min-height': cmToPixel(shelfItem.height, null).heightPx + 'px'}">
                 <v-menu
                   v-model="shelfMenu"
@@ -303,7 +306,7 @@ function onDrop(index, event) {
                 </v-menu>
                 <div class="position-absolute" v-for="(imageItem, itemIndex) in shelfItem.products">
                   <v-img
-                    @contextmenu.prevent="openMenu(itemIndex, index, $event)"
+                    @contextmenu.prevent.stop="openMenu(itemIndex, index, $event)"
                     class="cursor-move image-item"
                     draggable="true"
                     @dragstart="onDragStart(shelfItem, itemIndex, index, $event)"
