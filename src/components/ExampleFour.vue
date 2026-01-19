@@ -7,6 +7,19 @@ import LoadingState from "@/components/loadingState.vue";
 import CustomSnackbar from "@/components/CustomSnackbar.vue";
 import EditProductDialog from "@/components/dialog/editProductDialog.vue";
 import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
+import { useSound } from '@vueuse/sound'
+import bonk from '@/assets/sounds/bonk.mp3'
+import minecraftClick from '@/assets/sounds/minecraftClick.mp3'
+
+const { play: deleteSound } = useSound(bonk, {
+  volume: 0.4,
+  interrupt: true
+})
+
+const { play: addProductSound } = useSound(minecraftClick, {
+  volume: 1,
+  interrupt: true
+})
 
 const menu = ref(false)
 const shelfMenu = ref(false)
@@ -64,6 +77,7 @@ function action(method) {
     case "delete":
       shelf.value[indexShelfToDelete.value].products.splice(indexProductToDelete.value, 1)
       menu.value = false
+      deleteSound()
       break;
     case "edit":
       editProductModel.value = true
@@ -116,35 +130,46 @@ function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
 
 }
 
-function canAddShelf(newShelfHeight){
-  const actualHeightTotal = shelf.value.reduce((acc, item) => acc + item.height, 0);
-  if (actualHeightTotal + newShelfHeight > standSize.value.height) {
-    if (standSize.value.height - actualHeightTotal === 0) {
-      showFeedback(`Não cabe! Esquece fi, ja gastou todo o espaço`)
-      return false
-    }
-    showFeedback(`Não cabe! Espaço disponível: ${standSize.value.height - actualHeightTotal} cm`)
+function canAddShelf(newShelfHeight) {
+  const totalHeight = shelf.value.reduce((sum, { height }) => sum + height, 0)
+  const availableSpace = standSize.value.height - totalHeight
+  if (newShelfHeight > availableSpace) {
+    const message = availableSpace === 0
+      ? 'Não cabe! Esquece fi, já gastou todo o espaço'
+      : `Não cabe! Espaço disponível: ${availableSpace} cm`
+    showFeedback(message)
     return false
   }
   return true
 }
 
 function addProduct(productItem) {
-  const currentProductWidth = productItem.width
-  if (canAddProduct(shelf.value[0].products, standSize.value.width, currentProductWidth)) {
-    showFeedback(`Limite atingido não é possivel adicionar mais produtos`)
+  const shelfRef = shelf.value[0]
+  const { width, height } = productItem
+
+  if (canAddProduct(shelfRef.products, standSize.value.width, width)) {
+    showFeedback('Limite atingido, não é possível adicionar mais produtos')
     return
   }
-  const copyProduct = JSON.parse(JSON.stringify(productItem))
-  const shelfPixel = cmToPixel(shelf.value[0].height, null).heightPx
-  copyProduct.position = shelf.value[0].products.length
-  const allPositionsX = shelf.value[0].products.map(item => item.x);
-  const maxX = Math.max(...allPositionsX, 0);
+  addProductSound()
 
-  copyProduct.x = maxX > 0 ? maxX + cmToPixel(null, copyProduct.width).widthPx : cmToPixel(null, copyProduct.width).widthPx
-  console.log(copyProduct.x)
-  copyProduct.y = shelfPixel - cmToPixel(copyProduct.height, null).heightPx
-  shelf.value[0].products.push(copyProduct)
+  const product = JSON.parse(JSON.stringify(productItem))
+  const shelfHeightPx = cmToPixel(shelfRef.height).heightPx
+  const productWidthPx = cmToPixel(null, width).widthPx
+  const productHeightPx = cmToPixel(height).heightPx
+
+  product.position = shelfRef.products.length
+
+  const products = shelfRef.products
+  const lastProduct = products.at(-1)
+
+  product.x = lastProduct
+    ? lastProduct.x + cmToPixel(null, lastProduct.width).widthPx
+    : 0
+
+  product.y = shelfHeightPx - productHeightPx
+
+  shelfRef.products.push(product)
 }
 
 function addShelf() {
@@ -157,7 +182,6 @@ function addShelf() {
     height: shelfHeight.value,
     products: []
   });
-
   shelfHeight.value = null;
 }
 
@@ -182,38 +206,43 @@ function onDragEnd() {
 
 function onDrop(index, event, shelfHeight = 0) {
   if (!draggedItem.value.item) return
-  const sourceShelf = shelf.value[draggedShelfIndex.value]
-  const destShelf = shelf.value[index]
 
-  if (sourceShelf.products[draggedItem.value.index].height > destShelf.height) {
-    showFeedback(`Opa maninho, o produto tem ${sourceShelf.products[draggedItem.value.index].height}cm de altura  e a estante tem ${destShelf.height}cm, não rola né`)
+  const sourceIndex = draggedShelfIndex.value
+  const sourceShelf = shelf.value[sourceIndex]
+  const destShelf = shelf.value[index]
+  const draggedIndex = draggedItem.value.index
+
+  const draggedProduct = sourceShelf.products[draggedIndex]
+
+  if (draggedProduct.height > destShelf.height) {
+    showFeedback(
+      `Opa maninho, o produto tem ${draggedProduct.height}cm de altura e a estante tem ${destShelf.height}cm, não rola né`
+    )
     return
   }
 
-  let insertIndex = index
-  const container = event.currentTarget;
-  const item = event.target;
-
-  const containerRect = container.getBoundingClientRect();
-  const itemRect = item.getBoundingClientRect();
-
-  const productsCopy = [...sourceShelf.products];
-
-  const removedItem = productsCopy.splice(draggedItem.value.index, 1)[0];
-  const removedItemHeight = cmToPixel(removedItem.height, null).heightPx
-  if (draggedShelfIndex.value !== index && canAddProduct(shelf.value[index].products, standSize.value.width, removedItem.width)) {
+  const isDifferentShelf = sourceIndex !== index
+  if (
+    isDifferentShelf &&
+    canAddProduct(destShelf.products, standSize.value.width, draggedProduct.width)
+  ) {
     showFeedback(`Limite atingido não é possivel adicionar mais produtos`)
     return
   }
-  sourceShelf.products.splice(draggedItem.value.index, 1);
 
-  const newX = event.clientX - containerRect.left - draggedItem.value.offsetX;
-  const newY = event.clientY - containerRect.top - draggedItem.value.offsetY;
+  const [removedItem] = sourceShelf.products.splice(draggedIndex, 1)
 
-  removedItem.x = newX < 0 ? 0 : newX
-  removedItem.y = shelfHeight - removedItemHeight;
+  const container = event.currentTarget
+  const containerRect = container.getBoundingClientRect()
+  const removedItemHeight = cmToPixel(removedItem.height, null).heightPx
 
-  if (draggedShelfIndex.value === index && draggedItem.value.index < index) {
+  const newX = event.clientX - containerRect.left - draggedItem.value.offsetX
+
+  removedItem.x = Math.max(0, newX)
+  removedItem.y = shelfHeight - removedItemHeight
+
+  let insertIndex = index
+  if (sourceIndex === index && draggedIndex < index) {
     insertIndex--
   }
 
@@ -221,8 +250,10 @@ function onDrop(index, event, shelfHeight = 0) {
   destShelf.products.forEach((item, i) => {
     item.position = i
   })
-  if (draggedShelfIndex.value === index) {
-    sourceShelf.products.forEach((item, i) => (item.position = i))
+  if (sourceIndex === index) {
+    sourceShelf.products.forEach((item, i) => {
+      item.position = i
+    })
   }
   onDragEnd()
 }
