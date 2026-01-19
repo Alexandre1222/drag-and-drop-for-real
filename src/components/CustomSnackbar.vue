@@ -1,11 +1,9 @@
 <script setup>
 const snackbarModel = defineModel(false)
-const props = defineProps(
-  {
+const props = defineProps({
     snackbarColor: {},
     snackbarText: {},
-  }
-)
+  })
 </script>
 
 <template>

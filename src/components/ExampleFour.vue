@@ -5,6 +5,8 @@ import cmToPixel from "@/plugins/helper/cmToPixel.js";
 import productsDb from '@/plugins/database/products.json'
 import LoadingState from "@/components/loadingState.vue";
 import CustomSnackbar from "@/components/CustomSnackbar.vue";
+import EditProductDialog from "@/components/dialog/editProductDialog.vue";
+import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
 
 const menu = ref(false)
 const shelfMenu = ref(false)
@@ -17,8 +19,10 @@ const shelfMenuPosition = ref({
   x: 0,
   y: 0
 })
-
+const currentShelf = ref(null)
 const addProductModel = ref(false)
+const editProductModel = ref(false)
+const editShelfModel = ref(false)
 const productList = ref(null)
 const standSize = ref({
   height: 160,
@@ -38,6 +42,13 @@ const snackbar = ref({
   color: "error"
 });
 
+function editShelf(newHeight, index){
+  if (!canAddShelf(newHeight)){
+    return
+  }
+  shelf.value[index].height = newHeight
+}
+
 function openMenu(index, shelfIndex, event) {
   if (shelfMenu.value) {
     shelfMenu.value = false
@@ -48,9 +59,18 @@ function openMenu(index, shelfIndex, event) {
   menu.value = true
 }
 
-function action() {
-  shelf.value[indexShelfToDelete.value].products.splice(indexProductToDelete.value, 1)
-  menu.value = false
+function action(method) {
+  switch (method){
+    case "delete":
+      shelf.value[indexShelfToDelete.value].products.splice(indexProductToDelete.value, 1)
+      menu.value = false
+      break;
+    case "edit":
+      editProductModel.value = true
+      break;
+    default:
+      console.warn("method not recognized")
+  }
 }
 
 function openShelfMenu(shelfIndex, event) {
@@ -63,9 +83,16 @@ function openShelfMenu(shelfIndex, event) {
   shelfMenu.value = true
 }
 
-function actionShelf() {
-  shelf.value.splice(shelfIndexToDelete.value, 1)
-  shelfMenu.value = false
+function actionShelf(method) {
+  switch (method){
+    case 'delete':
+      shelf.value.splice(shelfIndexToDelete.value, 1)
+      shelfMenu.value = false
+      break;
+    case 'edit':
+      currentShelf.value = shelf.value[shelfIndexToDelete.value]
+      editShelfModel.value = true
+  }
 }
 
 function showFeedback(msg, color = 'error') {
@@ -89,6 +116,19 @@ function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
 
 }
 
+function canAddShelf(newShelfHeight){
+  const actualHeightTotal = shelf.value.reduce((acc, item) => acc + item.height, 0);
+  if (actualHeightTotal + newShelfHeight > standSize.value.height) {
+    if (standSize.value.height - actualHeightTotal === 0) {
+      showFeedback(`Não cabe! Esquece fi, ja gastou todo o espaço`)
+      return false
+    }
+    showFeedback(`Não cabe! Espaço disponível: ${standSize.value.height - actualHeightTotal} cm`)
+    return false
+  }
+  return true
+}
+
 function addProduct(productItem) {
   const currentProductWidth = productItem.width
   if (canAddProduct(shelf.value[0].products, standSize.value.width, currentProductWidth)) {
@@ -96,25 +136,25 @@ function addProduct(productItem) {
     return
   }
   const copyProduct = JSON.parse(JSON.stringify(productItem))
+  const shelfPixel = cmToPixel(shelf.value[0].height, null).heightPx
   copyProduct.position = shelf.value[0].products.length
+  const allPositionsX = shelf.value[0].products.map(item => item.x);
+  const maxX = Math.max(...allPositionsX, 0);
+
+  copyProduct.x = maxX > 0 ? maxX + cmToPixel(null, copyProduct.width).widthPx : cmToPixel(null, copyProduct.width).widthPx
+  console.log(copyProduct.x)
+  copyProduct.y = shelfPixel - cmToPixel(copyProduct.height, null).heightPx
   shelf.value[0].products.push(copyProduct)
 }
 
 function addShelf() {
   if (!shelfHeight.value) return;
-  const newHeight = Number(shelfHeight.value);
-  const actualHeightTotal = shelf.value.reduce((acc, item) => acc + item.height, 0);
-  if (actualHeightTotal + newHeight > standSize.value.height) {
-    if (standSize.value.height - actualHeightTotal === 0) {
-      showFeedback(`Não cabe! Esquece fi, ja gastou todo o espaço`)
-      return
-    }
-    showFeedback(`Não cabe! Espaço disponível: ${standSize.value.height - actualHeightTotal} cm`)
-    return;
+  if (!canAddShelf(shelfHeight.value)){
+    return
   }
 
   shelf.value.push({
-    height: newHeight,
+    height: shelfHeight.value,
     products: []
   });
 
@@ -266,7 +306,12 @@ onMounted(() => {
                       slim
                       nav
                     >
-                      <v-list-item density="compact" @click="actionShelf">
+                      <v-list-item density="compact" @click="actionShelf('edit')">
+                        <v-list-item-title>
+                          Editar Prateleira
+                        </v-list-item-title>
+                      </v-list-item>
+                      <v-list-item density="compact" @click="actionShelf('delete')">
                         <v-list-item-title>
                           Deletar Prateleira
                         </v-list-item-title>
@@ -298,7 +343,12 @@ onMounted(() => {
                         slim
                         nav
                       >
-                        <v-list-item density="compact" @click="action(itemIndex, index)">
+                        <v-list-item density="compact" @click="action('edit')">
+                          <v-list-item-title>
+                            Editar
+                          </v-list-item-title>
+                        </v-list-item>
+                        <v-list-item density="compact" @click="action('delete')">
                           <v-list-item-title>
                             Excluir
                           </v-list-item-title>
@@ -322,6 +372,10 @@ onMounted(() => {
   </v-container>
 
   <add-product-dialog v-model="addProductModel" @save-product="saveProduct"/>
+
+  <edit-product-dialog v-model="editProductModel"/>
+
+  <edit-shelf-dialog v-model="editShelfModel" :current-shelf="currentShelf" :currentShelfIndex="shelfIndexToDelete" @edit-shelf="editShelf"/>
 
   <custom-snackbar v-model="snackbar.show" :snackbar-color="snackbar.color" :snackbar-text="snackbar.text"/>
 </template>
