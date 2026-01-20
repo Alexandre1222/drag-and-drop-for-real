@@ -10,6 +10,7 @@ import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
 import { useSound } from '@vueuse/sound'
 import bonk from '@/assets/sounds/bonk.mp3'
 import minecraftClick from '@/assets/sounds/minecraftClick.mp3'
+import magic from '@/assets/sounds/magic.mp3'
 
 const { play: deleteSound } = useSound(bonk, {
   volume: 0.4,
@@ -18,6 +19,11 @@ const { play: deleteSound } = useSound(bonk, {
 
 const { play: addProductSound } = useSound(minecraftClick, {
   volume: 1,
+  interrupt: true
+})
+
+const { play: addMagicSound } = useSound(magic, {
+  volume: 0.5,
   interrupt: true
 })
 
@@ -204,6 +210,68 @@ function onDragEnd() {
   draggedShelfIndex.value = null
 }
 
+function doFormatAlign(align, shelfIndex) {
+  addMagicSound()
+
+  const currentShelf = shelf.value[shelfIndex]
+  const shelfWidth = cmToPixel(null, standSize.value.width).widthPx
+
+  const sortedProducts = [...currentShelf.products].sort(
+    (a, b) => a.x - b.x
+  )
+
+  const productsWithWidth = sortedProducts.map(product => ({
+    product,
+    widthPx: cmToPixel(null, product.width).widthPx
+  }))
+
+  const totalProductsWidth = productsWithWidth.reduce(
+    (acc, item) => acc + item.widthPx,
+    0
+  )
+
+  const count = productsWithWidth.length
+
+  let start = 0
+  let gap = 0
+
+  switch (align) {
+    case 'left':
+      start = 0
+      gap = 0
+      break
+
+    case 'right':
+      start = shelfWidth - totalProductsWidth
+      gap = 0
+      break
+
+    case 'center':
+      start = (shelfWidth - totalProductsWidth) / 2
+      gap = 0
+      break
+
+    case 'justify':
+      if (count > 1) {
+        start = 0
+        gap = (shelfWidth - totalProductsWidth) / (count - 1)
+      }
+      break
+
+    default:
+      showFeedback(`método não criado ainda para o ${align}`)
+      return
+  }
+
+  let position = start
+
+  for (const { product, widthPx } of productsWithWidth) {
+    product.x = position
+    position += widthPx + gap
+  }
+}
+
+
 function onDrop(index, event, shelfHeight = 0) {
   if (!draggedItem.value.item) return
 
@@ -230,13 +298,18 @@ function onDrop(index, event, shelfHeight = 0) {
     return
   }
 
-  const [removedItem] = sourceShelf.products.splice(draggedIndex, 1)
+  const removedItem = sourceShelf.products[draggedIndex]
 
   const container = event.currentTarget
   const containerRect = container.getBoundingClientRect()
   const removedItemHeight = cmToPixel(removedItem.height, null).heightPx
 
   const newX = event.clientX - containerRect.left - draggedItem.value.offsetX
+
+  if (hasHorizontalCollision(destShelf.products, removedItem, newX)) {
+    showFeedback('Não é possível soltar o produto sobre outro')
+    return
+  }
 
   removedItem.x = Math.max(0, newX)
   removedItem.y = shelfHeight - removedItemHeight
@@ -246,6 +319,7 @@ function onDrop(index, event, shelfHeight = 0) {
     insertIndex--
   }
 
+  sourceShelf.products.splice(draggedIndex, 1)
   destShelf.products.splice(insertIndex, 0, removedItem)
   destShelf.products.forEach((item, i) => {
     item.position = i
@@ -258,12 +332,28 @@ function onDrop(index, event, shelfHeight = 0) {
   onDragEnd()
 }
 
+function hasHorizontalCollision(products, draggedItem, newX) {
+  const draggedWidthPx = cmToPixel(null, draggedItem.width).widthPx
+  const draggedStart = newX
+  const draggedEnd = newX + draggedWidthPx
+
+  return products.some(item => {
+    if (item === draggedItem) return false
+
+    const itemWidthPx = cmToPixel(null, item.width).widthPx
+    const itemStart = item.x
+    const itemEnd = item.x + itemWidthPx
+
+    return draggedStart < itemEnd && draggedEnd > itemStart
+  })
+}
+
 onMounted(() => {
   loading.value = true
   productList.value = productsDb
   setTimeout(() => {
     loading.value = false
-  }, 4000)
+  }, 5000)
 })
 </script>
 
@@ -318,9 +408,42 @@ onMounted(() => {
           </v-card>
         </v-col>
         <v-col cols="8" class="overflow-x-auto">
-          <v-card class="polka-dot pa-0 ma-0">
+          <v-card v-if="shelf && shelf.length > 0" class="polka-dot pa-0 ma-0">
             <v-card-item class="pa-0">
               <template v-for="(shelfItem, index) in shelf">
+                <v-btn-toggle density="compact" border divided>
+                  <v-btn size="x-small" @click.stop="doFormatAlign('left', index)">
+                    <span class="hidden-sm-and-down">Left</span>
+
+                    <v-icon end>
+                      mdi-format-align-left
+                    </v-icon>
+                  </v-btn>
+
+                  <v-btn size="x-small" @click.stop="doFormatAlign('center', index)">
+                    <span class="hidden-sm-and-down">Center</span>
+
+                    <v-icon end>
+                      mdi-format-align-center
+                    </v-icon>
+                  </v-btn>
+
+                  <v-btn size="x-small" @click.stop="doFormatAlign('right', index)">
+                    <span class="hidden-sm-and-down">Right</span>
+
+                    <v-icon end>
+                      mdi-format-align-right
+                    </v-icon>
+                  </v-btn>
+
+                  <v-btn size="x-small" @click.stop="doFormatAlign('justify', index)">
+                    <span class="hidden-sm-and-down">Justify</span>
+
+                    <v-icon end>
+                      mdi-format-align-justify
+                    </v-icon>
+                  </v-btn>
+                </v-btn-toggle>
                 <div class="flex-nowrap droppable-area menu-area"
                      @contextmenu.prevent.stop="openShelfMenu(index, $event)"
                      @drop="onDrop(index, $event, cmToPixel(shelfItem.height, null).heightPx)" @dragover.prevent
@@ -391,6 +514,32 @@ onMounted(() => {
                 <v-divider thickness="5" color="black" variant="solid" class="border-opacity-100"/>
               </template>
             </v-card-item>
+          </v-card>
+
+          <v-card v-else>
+            <v-empty-state icon="mdi-cart-off">
+              <template v-slot:media>
+                <v-img
+                  class="ma-auto"
+                  src="https://mystickermania.com/cdn/stickers/spongebob/sb-upset-fish-meme-512x512.png"
+                  :height="300"
+                  :width="500"
+                ></v-img>
+
+              </template>
+
+              <template v-slot:headline>
+                <div class="text-h4">
+                  Nenhuma prateleira adicionada
+                </div>
+              </template>
+
+              <template v-slot:title>
+                <div class="text-h6">
+                  Como você quer planogramar sem prateleiras
+                </div>
+              </template>
+            </v-empty-state>
           </v-card>
         </v-col>
       </v-row>
