@@ -22,7 +22,7 @@ function salvarProduto () {
     width: formData.value.width,
     depth: formData.value.depth
   }
-  emit("saveProduct", produto)
+  emit("saveProduct", [produto])
   reset()
   model.value = false
 }

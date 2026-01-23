@@ -7,22 +7,24 @@ import LoadingState from "@/components/loadingState.vue";
 import CustomSnackbar from "@/components/CustomSnackbar.vue";
 import EditProductDialog from "@/components/dialog/editProductDialog.vue";
 import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
-import { useSound } from '@vueuse/sound'
+import {useSound} from '@vueuse/sound'
 import bonk from '@/assets/sounds/bonk.mp3'
 import minecraftClick from '@/assets/sounds/minecraftClick.mp3'
 import magic from '@/assets/sounds/magic.mp3'
+import ImportProductDialog from "@/components/dialog/importProductDialog.vue";
+import {stringToColour} from "@/plugins/helper/stringToColour.js";
 
-const { play: deleteSound } = useSound(bonk, {
+const {play: deleteSound} = useSound(bonk, {
   volume: 0.4,
   interrupt: true
 })
 
-const { play: addProductSound } = useSound(minecraftClick, {
+const {play: addProductSound} = useSound(minecraftClick, {
   volume: 1,
   interrupt: true
 })
 
-const { play: addMagicSound } = useSound(magic, {
+const {play: addMagicSound} = useSound(magic, {
   volume: 0.5,
   interrupt: true
 })
@@ -34,10 +36,13 @@ const shelfIndexToDelete = ref(null)
 const indexProductToDelete = ref(null)
 const indexShelfToDelete = ref(null)
 const loading = ref(false)
+const importProductModel = ref(false)
 const shelfMenuPosition = ref({
   x: 0,
   y: 0
 })
+const showAssets = ref(false)
+const currentFocus = ref(null)
 const currentShelf = ref(null)
 const addProductModel = ref(false)
 const editProductModel = ref(false)
@@ -61,8 +66,8 @@ const snackbar = ref({
   color: "error"
 });
 
-function editShelf(newHeight, index){
-  if (!canAddShelf(newHeight)){
+function editShelf(newHeight, index) {
+  if (!canAddShelf(newHeight)) {
     return
   }
   shelf.value[index].height = newHeight
@@ -79,7 +84,7 @@ function openMenu(index, shelfIndex, event) {
 }
 
 function action(method) {
-  switch (method){
+  switch (method) {
     case "delete":
       shelf.value[indexShelfToDelete.value].products.splice(indexProductToDelete.value, 1)
       menu.value = false
@@ -104,7 +109,7 @@ function openShelfMenu(shelfIndex, event) {
 }
 
 function actionShelf(method) {
-  switch (method){
+  switch (method) {
     case 'delete':
       shelf.value.splice(shelfIndexToDelete.value, 1)
       shelfMenu.value = false
@@ -124,7 +129,11 @@ function showFeedback(msg, color = 'error') {
 }
 
 function saveProduct(product) {
-  productList.value.push(product)
+  for (const productElement of product) {
+    productElement.x = 0
+    productElement.y = 0
+    productList.value.push(productElement)
+  }
 }
 
 function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
@@ -137,7 +146,7 @@ function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
 }
 
 function canAddShelf(newShelfHeight) {
-  const totalHeight = shelf.value.reduce((sum, { height }) => sum + height, 0)
+  const totalHeight = shelf.value.reduce((sum, {height}) => sum + height, 0)
   const availableSpace = standSize.value.height - totalHeight
   if (newShelfHeight > availableSpace) {
     const message = availableSpace === 0
@@ -151,7 +160,7 @@ function canAddShelf(newShelfHeight) {
 
 function addProduct(productItem) {
   const shelfRef = shelf.value[0]
-  const { width, height } = productItem
+  const {width, height} = productItem
 
   if (canAddProduct(shelfRef.products, standSize.value.width, width)) {
     showFeedback('Limite atingido, não é possível adicionar mais produtos')
@@ -161,14 +170,12 @@ function addProduct(productItem) {
 
   const product = JSON.parse(JSON.stringify(productItem))
   const shelfHeightPx = cmToPixel(shelfRef.height).heightPx
-  const productWidthPx = cmToPixel(null, width).widthPx
   const productHeightPx = cmToPixel(height).heightPx
 
   product.position = shelfRef.products.length
 
   const products = shelfRef.products
   const lastProduct = products.at(-1)
-
   product.x = lastProduct
     ? lastProduct.x + cmToPixel(null, lastProduct.width).widthPx
     : 0
@@ -180,7 +187,7 @@ function addProduct(productItem) {
 
 function addShelf() {
   if (!shelfHeight.value) return;
-  if (!canAddShelf(shelfHeight.value)){
+  if (!canAddShelf(shelfHeight.value)) {
     return
   }
 
@@ -265,7 +272,7 @@ function doFormatAlign(align, shelfIndex) {
 
   let position = start
 
-  for (const { product, widthPx } of productsWithWidth) {
+  for (const {product, widthPx} of productsWithWidth) {
     product.x = position
     position += widthPx + gap
   }
@@ -348,6 +355,14 @@ function hasHorizontalCollision(products, draggedItem, newX) {
   })
 }
 
+function onFocus(currentImage) {
+  currentFocus.value = currentImage
+}
+
+function onFocusOut() {
+  currentFocus.value = null
+}
+
 onMounted(() => {
   loading.value = true
   productList.value = productsDb
@@ -385,9 +400,9 @@ onMounted(() => {
             <v-list lines="one" bg-color="transparent">
               <v-list-item
                 v-for="product in productList"
-                :key="product.sku"
-                :title="product.title"
-                :subtitle="product.sku"
+                :key="product.ean"
+                :title="product.subcategory"
+                :subtitle="product.category"
                 :prepend-avatar="product.previewUrl"
                 append-icon="mdi-plus"
                 @click.stop="addProduct(product)"
@@ -398,16 +413,31 @@ onMounted(() => {
                     rounded="0"
                     size="40"
                   >
-                    <v-img :src="product.previewUrl"></v-img>
+                    <v-img v-if="product.previewUrl" :src="product.previewUrl"></v-img>
+                    <v-icon v-else color="error">mdi-cancel</v-icon>
                   </v-avatar>
                 </template>
               </v-list-item>
             </v-list>
-            <v-btn block prepend-icon="mdi-plus" color="success" @click.stop="addProductModel = true">Adicionar produto
+            <v-btn block
+                   prepend-icon="mdi-plus"
+                   color="success"
+                   @click.stop="addProductModel = true"
+
+            >Adicionar produto
+            </v-btn>
+
+            <v-btn block
+                   prepend-icon="mdi-import"
+                   color="warning"
+                   @click.stop="importProductModel = true"
+            >Exportar produto
             </v-btn>
           </v-card>
         </v-col>
         <v-col cols="8" class="overflow-x-auto">
+          <v-switch label="Exibir Ilustrações" hide-details color="primary" v-model="showAssets"/>
+
           <v-card v-if="shelf && shelf.length > 0" class="polka-dot pa-0 ma-0">
             <v-card-item class="pa-0">
               <template v-for="(shelfItem, index) in shelf">
@@ -472,44 +502,56 @@ onMounted(() => {
                       </v-list-item>
                     </v-list>
                   </v-menu>
-                  <div class="position-absolute" v-for="(imageItem, itemIndex) in shelfItem.products">
+                  <div class="position-absolute" v-for="(imageItem, itemIndex) in shelfItem.products"
+                       @dragstart.stop="onDragStart(shelfItem, itemIndex, index, $event)"
+                       @dragend.stop="onDragEnd"
+                       @contextmenu.prevent.stop="openMenu(itemIndex, index, $event)"
+                       @focus="onFocus(imageItem)"
+                       @focusout="onFocusOut"
+                       draggable="true"
+                       tabindex="0"
+                  >
                     <v-img
-                      @contextmenu.prevent.stop="openMenu(itemIndex, index, $event)"
                       class="cursor-move image-item"
-                      draggable="true"
-                      @dragstart="onDragStart(shelfItem, itemIndex, index, $event)"
-                      @dragend="onDragEnd"
+                      v-if="showAssets && imageItem.previewUrl"
                       :src="imageItem.previewUrl"
                       :height="cmToPixel(imageItem.height, imageItem.width).heightPx"
                       :width="cmToPixel(imageItem.height, imageItem.width).widthPx"
                       :style="{top: `${imageItem.y}px`,left: `${imageItem.x}px`}"
-                    >
-                    </v-img>
-                    <v-menu
-                      v-model="menu"
-                      location="end"
-                      scroll-strategy="close"
-                      :target="menuTarget"
-                    >
-                      <v-list
-                        class="py-0"
-                        density="compact"
-                        slim
-                        nav
-                      >
-                        <v-list-item density="compact" @click="action('edit')">
-                          <v-list-item-title>
-                            Editar
-                          </v-list-item-title>
-                        </v-list-item>
-                        <v-list-item density="compact" @click="action('delete')">
-                          <v-list-item-title>
-                            Excluir
-                          </v-list-item-title>
-                        </v-list-item>
-                      </v-list>
-                    </v-menu>
+                    />
+                    <v-sheet
+                      v-else
+                      class="cursor-move image-item position-absolute imageless"
+                      :height="cmToPixel(imageItem.height, imageItem.width).heightPx"
+                      :width="cmToPixel(imageItem.height, imageItem.width).widthPx"
+                      :style="{top: `${imageItem.y}px`,left: `${imageItem.x}px`, 'background-color': stringToColour(imageItem.ean)}"
+                    />
+
                   </div>
+                  <v-menu
+                    v-model="menu"
+                    location="end"
+                    scroll-strategy="close"
+                    :target="menuTarget"
+                  >
+                    <v-list
+                      class="py-0"
+                      density="compact"
+                      slim
+                      nav
+                    >
+                      <v-list-item density="compact" @click="action('edit')">
+                        <v-list-item-title>
+                          Editar
+                        </v-list-item-title>
+                      </v-list-item>
+                      <v-list-item density="compact" @click="action('delete')">
+                        <v-list-item-title>
+                          Excluir
+                        </v-list-item-title>
+                      </v-list-item>
+                    </v-list>
+                  </v-menu>
                 </div>
                 <v-divider thickness="5" color="black" variant="solid" class="border-opacity-100"/>
               </template>
@@ -546,7 +588,7 @@ onMounted(() => {
     </template>
     <template v-else>
       <v-container height="90vh" class="d-flex justify-center align-center">
-          <loading-state/>
+        <loading-state/>
       </v-container>
     </template>
   </v-container>
@@ -555,7 +597,10 @@ onMounted(() => {
 
   <edit-product-dialog v-model="editProductModel"/>
 
-  <edit-shelf-dialog v-model="editShelfModel" :current-shelf="currentShelf" :currentShelfIndex="shelfIndexToDelete" @edit-shelf="editShelf"/>
+  <edit-shelf-dialog v-model="editShelfModel" :current-shelf="currentShelf" :currentShelfIndex="shelfIndexToDelete"
+                     @edit-shelf="editShelf"/>
+
+  <import-product-dialog v-model="importProductModel" @update-products="saveProduct"/>
 
   <custom-snackbar v-model="snackbar.show" :snackbar-color="snackbar.color" :snackbar-text="snackbar.text"/>
 </template>
@@ -593,5 +638,14 @@ onMounted(() => {
 
 .droppable-area {
   position: relative;
+}
+
+.imageless {
+  position: absolute;
+  top: 80px;
+  right: 0;
+  width: 200px;
+  height: 100px;
+  border: 3px solid black;
 }
 </style>

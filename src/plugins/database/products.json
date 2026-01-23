@@ -1,8 +1,9 @@
 [
   {
-    "title": "Maionese Heinz 390g",
+    "category": "Condimentos",
+    "subcategory": "Maionese Heinz 390g",
     "previewUrl": "https://phygital-files.mercafacil.com/comercial-big-oferta/uploads/produto/heinz_maionese_390g_1684dc84-5ab9-4d35-a4f6-db95408160ee.png",
-    "sku": "19194518234",
+    "ean": "19194518234",
     "height": 16.9,
     "width": 10,
     "depth": 5.5,
@@ -10,9 +11,10 @@
     "x": 40
   },
   {
-    "title": "Ketchup Cepera 400g",
+    "category": "Condimentos",
+    "subcategory": "Ketchup Cepera 400g",
     "previewUrl": "https://phygital-files.mercafacil.com/primato/uploads/produto/ketchup_cepera_400g_tradicional_6f642c91-029c-4976-a93d-4d81393e9ca8.png",
-    "sku": "8951428573583",
+    "ean": "8951428573583",
     "height": 15,
     "width": 8,
     "depth": 5.5,
@@ -20,9 +22,10 @@
     "x": 50
   },
   {
-    "title": "Mobil Super 20W50",
+    "category": "Óleo de Motor",
+    "subcategory": "Mobil Super 20W50",
     "previewUrl": "https://pngfre.com/wp-content/uploads/Monster-24-300x300.png",
-    "sku": "8951428573583",
+    "ean": "8951428573583",
     "height": 15.7,
     "width": 6.5,
     "depth": 7,
