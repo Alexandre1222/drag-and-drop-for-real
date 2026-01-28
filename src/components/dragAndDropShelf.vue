@@ -30,14 +30,14 @@ const standSize = ref({
   height: 160,
   width: 92
 })
-const dragPreview = reactive({
-  show: false,
+const dragShow = ref([])
+const dragPreview = reactive([{
   x: 0,
   y: 0,
   width: 0,
   height: 0,
   ean: ''
-});
+}]);
 const shelfMenu = ref(false)
 const menuTarget = ref(null)
 const currentFocus = ref(null)
@@ -55,21 +55,26 @@ const previewStyle = computed(() => {
   };
 });
 
-function hasHorizontalCollision(products, draggedItem, newX) {
-  const draggedWidthPx = cmToPixel(null, draggedItem.width).widthPx
-  const draggedStart = newX
-  const draggedEnd = newX + draggedWidthPx
+function hasHorizontalCollision(products, itemToIgnore, newX) {
+  const previewWidthPx = dragPreview.width;
+
+  const draggedStart = newX;
+  const draggedEnd = newX + previewWidthPx;
+
+  if (!products) return false;
 
   return products.some(item => {
-    if (item === draggedItem) return false
+    if (!item) return false;
+    if (itemToIgnore && item === itemToIgnore) return false;
 
-    const itemWidthPx = cmToPixel(null, item.width).widthPx
-    const itemStart = item.x
-    const itemEnd = item.x + itemWidthPx
+    const itemWidthPx = cmToPixel(null, item.width).widthPx;
+    const itemStart = item.x;
+    const itemEnd = item.x + itemWidthPx;
 
-    return draggedStart < itemEnd && draggedEnd > itemStart
+    return draggedStart < itemEnd && draggedEnd > itemStart;
   })
 }
+
 function openShelfMenu(shelfIndex, event) {
   if (menu.value) {
     menu.value = false
@@ -81,6 +86,7 @@ function openShelfMenu(shelfIndex, event) {
   }
   shelfMenu.value = true
 }
+
 function actionShelf(method) {
   switch (method) {
     case 'delete':
@@ -92,6 +98,7 @@ function actionShelf(method) {
       editShelfModel.value = true
   }
 }
+
 function openMenu(index, shelfIndex, event) {
   if (shelfMenu.value) {
     shelfMenu.value = false
@@ -103,6 +110,7 @@ function openMenu(index, shelfIndex, event) {
   menuTarget.value = event.target.closest('.menuContext')
   menu.value = true
 }
+
 function action(method) {
   switch (method) {
     case "delete":
@@ -117,6 +125,7 @@ function action(method) {
       console.warn("method not recognized")
   }
 }
+
 function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
   let widthAcummulated = 0
   for (const currentShelfProduct of currentShelfProducts) {
@@ -128,10 +137,12 @@ function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
   return (productWidth + widthAcummulated) > currentShelfWidth;
 
 }
+
 function onDragStart(item, itemIndex, shelfIndex, event) {
   const rect = event.target.getBoundingClientRect();
-  const { widthPx, heightPx } = cmToPixel(item.height, item.width);
-  dragPreview.show = true;
+  const {widthPx, heightPx} = cmToPixel(item.height, item.width);
+  dragShow.value[shelfIndex] = true
+
   dragPreview.width = widthPx;
   dragPreview.height = heightPx;
   dragPreview.ean = item.ean;
@@ -144,6 +155,7 @@ function onDragStart(item, itemIndex, shelfIndex, event) {
   }
 
 }
+
 function doFormatAlign(align, shelfIndex) {
   addMagicSound()
 
@@ -204,6 +216,7 @@ function doFormatAlign(align, shelfIndex) {
     position += widthPx + gap
   }
 }
+
 function onDrop(index, event, shelfHeight = 0) {
   if (!draggedItem.value.item) return
 
@@ -237,7 +250,6 @@ function onDrop(index, event, shelfHeight = 0) {
   const removedItemHeight = cmToPixel(removedItem.height, null).heightPx
 
   const newX = event.clientX - containerRect.left - draggedItem.value.offsetX
-
   if (hasHorizontalCollision(destShelf.products, removedItem, newX)) {
     showSnackbar('Não é possível soltar o produto sobre outro')
     return
@@ -263,37 +275,48 @@ function onDrop(index, event, shelfHeight = 0) {
   }
   onDragEnd()
 }
+
 function onDragEnd() {
   draggedItem.value = {
     item: null,
     index: null,
     shelfIndex: null
   }
-    dragPreview.show = false
-    dragPreview.x = 0
-    dragPreview.y = 0
-    dragPreview.width = 0
-    dragPreview.height = 0
-    dragPreview.ean = ''
+  dragShow.value = []
 }
+
 const onDragOver = (event, shelfHeight, shelfIndex) => {
-  const destShelf = shelf.value[shelfIndex]
-  const heightPx = dragPreview.height
-  const draggedIndex = draggedItem.value.index
+  const destShelf = shelf.value[shelfIndex];
+  const heightPx = dragPreview.height;
+
+  const draggedIndex = draggedItem.value.index;
+  const sourceIndex = draggedItem.value.shelfIndex;
+
   const rect = event.currentTarget.getBoundingClientRect();
   dragPreview.x = event.clientX - rect.left - draggedItem.value.offsetX;
-  dragPreview.y = shelfHeight - heightPx
-  const removedItem = destShelf.products[draggedIndex]
+  dragPreview.y = shelfHeight - heightPx;
 
-  if (hasHorizontalCollision(destShelf.products, removedItem, dragPreview.x)){
-    previewStyle.value.backgroundColor = "#ff2c2c"
-  }else{
-    previewStyle.value.backgroundColor = stringToColour(dragPreview.ean)
+  let itemToIgnore = null;
+
+  if (sourceIndex === shelfIndex) {
+    itemToIgnore = destShelf.products[draggedIndex];
+    dragShow.value[shelfIndex] = true
+  } else {
+    dragShow.value = []
+    dragShow.value[shelfIndex] = true
+  }
+
+  if (hasHorizontalCollision(destShelf.products, itemToIgnore, dragPreview.x)) {
+    previewStyle.value.backgroundColor = "#ff2c2c";
+  } else {
+    previewStyle.value.backgroundColor = stringToColour(dragPreview.ean);
   }
 };
+
 function onFocus(currentImage) {
   currentFocus.value = currentImage
 }
+
 function onFocusOut() {
   currentFocus.value = null
 }
@@ -391,11 +414,10 @@ function onFocusOut() {
               :style="{top: `${imageItem.y}px`,left: `${imageItem.x}px`, 'background-color': stringToColour(imageItem.ean)}"
             />
             <div
-              v-if="dragPreview.show"
+              v-if="dragShow[index]"
               :style="previewStyle"
               class="drag-preview-ghost"
             />
-            {{imageItem}}
           </div>
           <v-menu
             v-model="menu"
@@ -492,8 +514,6 @@ function onFocusOut() {
 
 .imageless {
   position: absolute;
-  top: 80px;
-  right: 0;
   width: 200px;
   height: 100px;
   border: 3px solid black;

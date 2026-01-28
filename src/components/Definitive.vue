@@ -35,7 +35,6 @@ const headers = [
   {title: 'Cor', key: 'color', align: 'end', width: 50},
   {title: 'Action', key: 'action', align: 'end', width: 50},
 ]
-
 const menu = ref(false)
 const shelfMenu = ref(false)
 const menuTarget = ref(null)
@@ -59,6 +58,7 @@ const standSize = ref({
   height: 160,
   width: 92
 })
+
 const modules = ref({})
 const shelf = ref([
   {
@@ -128,6 +128,7 @@ function canAddShelf(newShelfHeight) {
 }
 
 function addProduct(productItem) {
+  if (productItem.label === 'category') return
   const shelfRef = shelf.value[0]
   const {width, height} = productItem
 
@@ -168,7 +169,7 @@ function addShelf() {
 
 onMounted(() => {
   loading.value = true
-  productList.value = productsDb
+  productList.value = productsDb.items
   setTimeout(() => {
     loading.value = false
   }, 1000)
@@ -181,210 +182,210 @@ onMounted(() => {
       <v-row>
         <v-col cols="12">
           <v-expansion-panels>
-              <v-expansion-panel>
-                <v-expansion-panel-title v-slot="{ expanded }">
-                  <v-row no-gutters>
-                    <v-col class="d-flex justify-start" cols="4">
-                      Caracteristicas do móvel
-                    </v-col>
-                    <v-col
-                      class="text--secondary"
-                      cols="8"
-                    >
-                      <v-fade-transition leave-absolute>
-                        <span v-if="expanded">Ajuste seu móvel como desejar</span>
-                        <v-row
-                          v-else
-                          style="width: 100%"
-                          no-gutters
-                        >
-                          <v-col class="d-flex justify-start" cols="6">
-                            Rock music
-                          </v-col>
-                        </v-row>
-                      </v-fade-transition>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-row dense>
-                    <v-col
-                      cols="12"
-                      md="4"
-                      sm="6"
-                    >
-                      <v-number-input
-                        density="compact"
-                        v-model="modules.qtd"
-                        label="N° de Módulos"
-                        required
-                      ></v-number-input>
-                    </v-col>
-
-                    <v-col
-                      cols="12"
-                      md="4"
-                      sm="6"
-                    >
-                      <v-number-input
-                        density="compact"
-                        label="Altura"
-                        required
-                      ></v-number-input>
-                    </v-col>
-
-                    <v-col
-                      cols="12"
-                      md="4"
-                      sm="6"
-                    >
-                      <v-number-input
-                        density="compact"
-                        label="Largura"
-                        v-model="modules.width"
-                        required
-                      ></v-number-input>
-                    </v-col>
-
-                    <v-col
-                      cols="12"
-                      md="4"
-                      sm="6"
-                    >
-                      <v-number-input
-                        density="compact"
-                        label="Base"
-                        v-model="modules.base"
-                        required
-                      ></v-number-input>
-                    </v-col>
-
-                    <v-col
-                      cols="12"
-                      md="4"
-                      sm="6"
-                    >
-                      <v-number-input
-                        density="compact"
-                        label="Profundidade"
-                        v-model="modules.depth"
-                        required
-                      ></v-number-input>
-                    </v-col>
-
-                    <v-col
-                      cols="12"
-                      md="4"
-                      sm="6"
-                    >
-                      <v-number-input
-                        density="compact"
-                        label="Linear ao solo"
-                        v-model="modules.linear"
-                        required
-                      ></v-number-input>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-              <v-expansion-panel>
-                <v-expansion-panel-title v-slot="{ expanded }">
-                  <v-row no-gutters>
-                    <v-col class="d-flex justify-start" cols="4">
-                      Desenho do módulo
-                    </v-col>
-                    <v-col
-                      class="text--secondary"
-                      cols="8"
-                    >
-                      <v-fade-transition leave-absolute>
-                        <span v-if="expanded">Customize e adicione prateleiras</span>
-                        <v-row
-                          v-else
-                          style="width: 100%"
-                          no-gutters
-                        >
-                          <v-col class="d-flex justify-start" cols="6">
-                            Possui {{ shelf.length }} colunas
-                          </v-col>
-                        </v-row>
-                      </v-fade-transition>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <v-sheet border rounded>
-                    <v-data-table
+            <v-expansion-panel>
+              <v-expansion-panel-title v-slot="{ expanded }">
+                <v-row no-gutters>
+                  <v-col class="d-flex justify-start" cols="4">
+                    Caracteristicas do móvel
+                  </v-col>
+                  <v-col
+                    class="text--secondary"
+                    cols="8"
+                  >
+                    <v-fade-transition leave-absolute>
+                      <span v-if="expanded">Ajuste seu móvel como desejar</span>
+                      <v-row
+                        v-else
+                        style="width: 100%"
+                        no-gutters
+                      >
+                        <v-col class="d-flex justify-start" cols="6">
+                          Rock music
+                        </v-col>
+                      </v-row>
+                    </v-fade-transition>
+                  </v-col>
+                </v-row>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <v-row dense>
+                  <v-col
+                    cols="12"
+                    md="4"
+                    sm="6"
+                  >
+                    <v-number-input
                       density="compact"
-                      :headers="headers"
-                      :items="shelf"
-                    >
-                      <template v-slot:top>
-                        <v-toolbar flat>
-                          <v-toolbar-title>
-                            <v-icon color="medium-emphasis" icon="mdi-cart-check" size="x-small" start></v-icon>
-                            Módulo
-                          </v-toolbar-title>
-                          <v-btn @click.stop="addShelf">
-                            Adicionar prateleira
-                          </v-btn>
-                        </v-toolbar>
-                      </template>
-                      <template v-slot:item.level="{ value, index }">
-                        {{ index + 1 }}
-                      </template>
+                      v-model="modules.qtd"
+                      label="N° de Módulos"
+                      required
+                    ></v-number-input>
+                  </v-col>
 
-                      <template v-slot:item.height="{ index }">
-                        <v-text-field
-                          controlVariant="split"
-                          density="compact"
-                          v-model="shelf[index].height"
-                          hide-details
-                        />
-                      </template>
+                  <v-col
+                    cols="12"
+                    md="4"
+                    sm="6"
+                  >
+                    <v-number-input
+                      density="compact"
+                      label="Altura"
+                      required
+                    ></v-number-input>
+                  </v-col>
 
-                      <template v-slot:item.width="{ index }">
-                        <v-text-field
-                          controlVariant="split"
-                          density="compact"
-                          v-model="shelf[index].width"
-                          hide-details
-                        />
-                      </template>
+                  <v-col
+                    cols="12"
+                    md="4"
+                    sm="6"
+                  >
+                    <v-number-input
+                      density="compact"
+                      label="Largura"
+                      v-model="modules.width"
+                      required
+                    ></v-number-input>
+                  </v-col>
 
-                      <template v-slot:item.tickness="{ index }">
-                        <v-text-field
-                          controlVariant="split"
-                          density="compact"
-                          v-model="shelf[index].tickness"
-                          hide-details
-                        />
-                      </template>
+                  <v-col
+                    cols="12"
+                    md="4"
+                    sm="6"
+                  >
+                    <v-number-input
+                      density="compact"
+                      label="Base"
+                      v-model="modules.base"
+                      required
+                    ></v-number-input>
+                  </v-col>
 
-                      <template v-slot:item.color="{ value,index }">
-                        <v-dialog max-width="500">
-                          <template v-slot:activator="{ props: activatorProps }">
-                            <div :style="{'background-color': value}" class="pa-2" v-bind="activatorProps"/>
-                          </template>
+                  <v-col
+                    cols="12"
+                    md="4"
+                    sm="6"
+                  >
+                    <v-number-input
+                      density="compact"
+                      label="Profundidade"
+                      v-model="modules.depth"
+                      required
+                    ></v-number-input>
+                  </v-col>
 
-                          <template v-slot:default="{ isActive }">
-                            <v-card title="Dialog">
-                              <v-card-text>
-                                <v-color-picker hide-inputs v-model="shelf[index].color"></v-color-picker>
-                              </v-card-text>
-                            </v-card>
-                          </template>
-                        </v-dialog>
-                      </template>
+                  <v-col
+                    cols="12"
+                    md="4"
+                    sm="6"
+                  >
+                    <v-number-input
+                      density="compact"
+                      label="Linear ao solo"
+                      v-model="modules.linear"
+                      required
+                    ></v-number-input>
+                  </v-col>
+                </v-row>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+            <v-expansion-panel>
+              <v-expansion-panel-title v-slot="{ expanded }">
+                <v-row no-gutters>
+                  <v-col class="d-flex justify-start" cols="4">
+                    Desenho do módulo
+                  </v-col>
+                  <v-col
+                    class="text--secondary"
+                    cols="8"
+                  >
+                    <v-fade-transition leave-absolute>
+                      <span v-if="expanded">Customize e adicione prateleiras</span>
+                      <v-row
+                        v-else
+                        style="width: 100%"
+                        no-gutters
+                      >
+                        <v-col class="d-flex justify-start" cols="6">
+                          Possui {{ shelf.length }} colunas
+                        </v-col>
+                      </v-row>
+                    </v-fade-transition>
+                  </v-col>
+                </v-row>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <v-sheet border rounded>
+                  <v-data-table
+                    density="compact"
+                    :headers="headers"
+                    :items="shelf"
+                  >
+                    <template v-slot:top>
+                      <v-toolbar flat>
+                        <v-toolbar-title>
+                          <v-icon color="medium-emphasis" icon="mdi-cart-check" size="x-small" start></v-icon>
+                          Módulo
+                        </v-toolbar-title>
+                        <v-btn @click.stop="addShelf">
+                          Adicionar prateleira
+                        </v-btn>
+                      </v-toolbar>
+                    </template>
+                    <template v-slot:item.level="{ value, index }">
+                      {{ index + 1 }}
+                    </template>
 
-                      <template v-slot:item.action="{ index }">
-                        <v-icon color="medium-emphasis" icon="mdi-delete" size="small"
-                                @click="shelf.splice(index, 1)"></v-icon>
-                      </template>
-                    </v-data-table>
-                  </v-sheet>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
+                    <template v-slot:item.height="{ index }">
+                      <v-text-field
+                        controlVariant="split"
+                        density="compact"
+                        v-model="shelf[index].height"
+                        hide-details
+                      />
+                    </template>
+
+                    <template v-slot:item.width="{ index }">
+                      <v-text-field
+                        controlVariant="split"
+                        density="compact"
+                        v-model="shelf[index].width"
+                        hide-details
+                      />
+                    </template>
+
+                    <template v-slot:item.tickness="{ index }">
+                      <v-text-field
+                        controlVariant="split"
+                        density="compact"
+                        v-model="shelf[index].tickness"
+                        hide-details
+                      />
+                    </template>
+
+                    <template v-slot:item.color="{ value,index }">
+                      <v-dialog max-width="500">
+                        <template v-slot:activator="{ props: activatorProps }">
+                          <div :style="{'background-color': value}" class="pa-2" v-bind="activatorProps"/>
+                        </template>
+
+                        <template v-slot:default="{ isActive }">
+                          <v-card title="Dialog">
+                            <v-card-text>
+                              <v-color-picker hide-inputs v-model="shelf[index].color"></v-color-picker>
+                            </v-card-text>
+                          </v-card>
+                        </template>
+                      </v-dialog>
+                    </template>
+
+                    <template v-slot:item.action="{ index }">
+                      <v-icon color="medium-emphasis" icon="mdi-delete" size="small"
+                              @click="shelf.splice(index, 1)"></v-icon>
+                    </template>
+                  </v-data-table>
+                </v-sheet>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
           </v-expansion-panels>
         </v-col>
         <v-col cols="12">
@@ -397,29 +398,32 @@ onMounted(() => {
                 <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o produto"
                               single-line
                               prepend-inner-icon="mdi-magnify" hide-details/>
-                <v-list lines="one" bg-color="transparent">
-                  <v-list-item
-                    v-for="product in productList"
-                    :key="product.ean"
-                    :title="product.subcategory"
-                    :subtitle="product.category"
-                    :prepend-avatar="product.previewUrl"
-                    append-icon="mdi-plus"
-                    @click.stop="addProduct(product)"
-                    draggable="true"
-                  >
-                    <template v-slot:prepend>
-                      <v-avatar
-                        color="grey"
-                        rounded="0"
-                        size="40"
-                      >
-                        <v-img v-if="product.previewUrl" :src="product.previewUrl"></v-img>
-                        <v-icon v-else color="error">mdi-cancel</v-icon>
-                      </v-avatar>
-                    </template>
-                  </v-list-item>
-                </v-list>
+                <v-treeview
+                  :items="productList ?? []"
+                  density="compact"
+                  color="primary"
+                  bg-color="white"
+                  activatable
+                  border
+                  fluid
+                  open-on-click
+                  rounded
+                >
+                  <template v-slot:prepend="{ item, isOpen }">
+                    <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
+                  </template>
+
+                  <template v-slot:title="{ item }">
+                    <div
+                      class="draggable-node"
+                      :draggable="!item.children"
+                      @click.stop="addProduct(item)"
+                    >
+                      <span class="text-subtitle-1">{{ item.title }}</span><br>
+                      <span v-if="item.width && item.height" class="text-caption">{{ item.width }}cm/{{ item.height }}cm</span>
+                    </div>
+                  </template>
+                </v-treeview>
                 <v-btn block
                        prepend-icon="mdi-plus"
                        color="success"
@@ -436,49 +440,49 @@ onMounted(() => {
                 </v-btn>
               </v-card>
             </v-col>
-            <v-col cols="12">
-              <v-card color="white" :disabled="shelf.length === 0">
-                <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o Elemento decorativo"
-                              single-line
-                              prepend-inner-icon="mdi-magnify" hide-details/>
-                <v-list lines="one" bg-color="transparent">
-                  <v-list-item
-                    v-for="product in productList"
-                    :key="product.ean"
-                    :title="product.subcategory"
-                    :subtitle="product.category"
-                    :prepend-avatar="product.previewUrl"
-                    append-icon="mdi-plus"
-                    @click.stop="addProduct(product)"
-                  >
-                    <template v-slot:prepend>
-                      <v-avatar
-                        color="grey"
-                        rounded="0"
-                        size="40"
-                      >
-                        <v-img v-if="product.previewUrl" :src="product.previewUrl"></v-img>
-                        <v-icon v-else color="error">mdi-cancel</v-icon>
-                      </v-avatar>
-                    </template>
-                  </v-list-item>
-                </v-list>
-                <v-btn block
-                       prepend-icon="mdi-plus"
-                       color="success"
-                       @click.stop="addProductModel = true"
+            <!--            <v-col cols="12">
+                          <v-card color="white" :disabled="shelf.length === 0">
+                            <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o Elemento decorativo"
+                                          single-line
+                                          prepend-inner-icon="mdi-magnify" hide-details/>
+                            <v-list lines="one" bg-color="transparent">
+                              <v-list-item
+                                v-for="product in productList"
+                                :key="product.ean"
+                                :title="product.subcategory"
+                                :subtitle="product.category"
+                                :prepend-avatar="product.previewUrl"
+                                append-icon="mdi-plus"
+                                @click.stop="addProduct(product)"
+                              >
+                                <template v-slot:prepend>
+                                  <v-avatar
+                                    color="grey"
+                                    rounded="0"
+                                    size="40"
+                                  >
+                                    <v-img v-if="product.previewUrl" :src="product.previewUrl"></v-img>
+                                    <v-icon v-else color="error">mdi-cancel</v-icon>
+                                  </v-avatar>
+                                </template>
+                              </v-list-item>
+                            </v-list>
+                            <v-btn block
+                                   prepend-icon="mdi-plus"
+                                   color="success"
+                                   @click.stop="addProductModel = true"
 
-                >Adicionar produto
-                </v-btn>
+                            >Adicionar produto
+                            </v-btn>
 
-                <v-btn block
-                       prepend-icon="mdi-import"
-                       color="warning"
-                       @click.stop="importProductModel = true"
-                >Exportar produto
-                </v-btn>
-              </v-card>
-            </v-col>
+                            <v-btn block
+                                   prepend-icon="mdi-import"
+                                   color="warning"
+                                   @click.stop="importProductModel = true"
+                            >Exportar produto
+                            </v-btn>
+                          </v-card>
+                        </v-col>-->
           </v-row>
         </v-col>
         <v-col cols="9" class="overflow-x-auto">
