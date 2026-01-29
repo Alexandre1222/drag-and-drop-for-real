@@ -1,12 +1,11 @@
 <script setup>
 import cmToPixel from "@/plugins/helper/cmToPixel.js";
 import {stringToColour} from "@/plugins/helper/stringToColour.js";
-import {computed, reactive, ref} from "vue";
+import {computed, reactive, ref, watch} from "vue";
 import {showSnackbar} from "@/plugins/helper/customSnackbar.js";
 import {useSound} from "@vueuse/sound";
 import bonk from "@/assets/sounds/bonk.mp3";
 import magic from "@/assets/sounds/magic.mp3";
-import CmToPixel from "@/plugins/helper/cmToPixel.js";
 
 const props = defineProps({
   showAssets: {
@@ -30,6 +29,7 @@ const standSize = ref({
   height: 160,
   width: 92
 })
+
 const dragShow = ref([])
 const dragPreview = reactive([{
   x: 0,
@@ -93,9 +93,6 @@ function actionShelf(method) {
       shelf.value.splice(selectedShelf.value.index, 1)
       shelfMenu.value = false
       break;
-    case 'edit':
-      currentShelf.value = shelf.value[selectedShelf.value.index]
-      editShelfModel.value = true
   }
 }
 
@@ -117,9 +114,6 @@ function action(method) {
       shelf.value[draggedItem.value.shelfIndex].products.splice(draggedItem.value.index, 1)
       menu.value = false
       deleteSound()
-      break;
-    case "edit":
-      editProductModel.value = true
       break;
     default:
       console.warn("method not recognized")
@@ -295,15 +289,12 @@ const onDragOver = (event, shelfHeight, shelfIndex) => {
   const rect = event.currentTarget.getBoundingClientRect();
   dragPreview.x = event.clientX - rect.left - draggedItem.value.offsetX;
   dragPreview.y = shelfHeight - heightPx;
+  dragShow.value.fill(false)
 
+  dragShow.value[shelfIndex] = true
   let itemToIgnore = null;
-
   if (sourceIndex === shelfIndex) {
     itemToIgnore = destShelf.products[draggedIndex];
-    dragShow.value[shelfIndex] = true
-  } else {
-    dragShow.value = []
-    dragShow.value[shelfIndex] = true
   }
 
   if (hasHorizontalCollision(destShelf.products, itemToIgnore, dragPreview.x)) {

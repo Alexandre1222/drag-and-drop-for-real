@@ -167,6 +167,15 @@ function addShelf() {
   });
 }
 
+function updateProductsPosition(index){
+  const currentShelf = shelf.value[index]
+  const shelfHeight = cmToPixel(currentShelf.height, null).heightPx
+  for (const product of currentShelf.products) {
+    const productHeight = cmToPixel(product.height, null).heightPx
+    product.y = shelfHeight - productHeight
+  }
+}
+
 onMounted(() => {
   loading.value = true
   productList.value = productsDb.items
@@ -177,7 +186,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <v-container>
+  <v-container fluid>
     <template v-if="!loading">
       <v-row>
         <v-col cols="12">
@@ -340,6 +349,7 @@ onMounted(() => {
                         controlVariant="split"
                         density="compact"
                         v-model="shelf[index].height"
+                        @update:model-value="updateProductsPosition(index)"
                         hide-details
                       />
                     </template>
