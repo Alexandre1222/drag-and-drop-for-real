@@ -1,19 +1,18 @@
 <script setup>
-import {onMounted, ref, shallowRef, toRef} from "vue";
+import {onMounted, ref} from "vue";
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
 import cmToPixel from "@/plugins/helper/cmToPixel.js";
 import productsDb from '@/plugins/database/products.json'
 import LoadingState from "@/components/loadingState.vue";
-import CustomSnackbar from "@/components/CustomSnackbar.vue";
 import EditProductDialog from "@/components/dialog/editProductDialog.vue";
 import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
 import {useSound} from '@vueuse/sound'
-import bonk from '@/assets/sounds/bonk.mp3'
 import minecraftClick from '@/assets/sounds/minecraftClick.mp3'
 import magic from '@/assets/sounds/magic.mp3'
 import ImportProductDialog from "@/components/dialog/importProductDialog.vue";
-import {stringToColour} from "@/plugins/helper/stringToColour.js";
 import DragAndDropShelf from "@/components/dragAndDropShelf.vue";
+import ResultDialog from "@/components/dialog/resultDialog.vue";
+import {showSnackbar} from "@/plugins/helper/customSnackbar.js";
 
 const {play: addProductSound} = useSound(minecraftClick, {
   volume: 1,
@@ -35,20 +34,11 @@ const headers = [
   {title: 'Cor', key: 'color', align: 'end', width: 50},
   {title: 'Action', key: 'action', align: 'end', width: 50},
 ]
-const menu = ref(false)
-const shelfMenu = ref(false)
-const menuTarget = ref(null)
+const resultModel = ref(false)
 const shelfIndexToDelete = ref(null)
-const indexProductToDelete = ref(null)
-const indexShelfToDelete = ref(null)
 const loading = ref(false)
 const importProductModel = ref(false)
-const shelfMenuPosition = ref({
-  x: 0,
-  y: 0
-})
 const showAssets = ref(false)
-const currentFocus = ref(null)
 const currentShelf = ref(null)
 const addProductModel = ref(false)
 const editProductModel = ref(false)
@@ -88,15 +78,6 @@ function editShelf(newHeight, index) {
   shelf.value[index].height = newHeight
 }
 
-
-function showFeedback(msg, color = 'error') {
-  snackbar.value = {
-    show: true,
-    text: msg,
-    color: color
-  }
-}
-
 function saveProduct(product) {
   for (const productElement of product) {
     productElement.x = 0
@@ -121,7 +102,7 @@ function canAddShelf(newShelfHeight) {
     const message = availableSpace === 0
       ? 'Não cabe! Esquece fi, já gastou todo o espaço'
       : `Não cabe! Espaço disponível: ${availableSpace} cm`
-    showFeedback(message)
+    showSnackbar(message)
     return false
   }
   return true
@@ -133,7 +114,7 @@ function addProduct(productItem) {
   const {width, height} = productItem
 
   if (canAddProduct(shelfRef.products, standSize.value.width, width)) {
-    showFeedback('Limite atingido, não é possível adicionar mais produtos')
+    showSnackbar('Limite atingido, não é possível adicionar mais produtos')
     return
   }
   addProductSound()
@@ -167,7 +148,7 @@ function addShelf() {
   });
 }
 
-function updateProductsPosition(index){
+function updateProductsPosition(index) {
   const currentShelf = shelf.value[index]
   const shelfHeight = cmToPixel(currentShelf.height, null).heightPx
   for (const product of currentShelf.products) {
@@ -179,6 +160,12 @@ function updateProductsPosition(index){
 onMounted(() => {
   loading.value = true
   productList.value = productsDb.items
+  window.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'k') {
+      e.preventDefault()
+      resultModel.value = true
+    }
+  })
   setTimeout(() => {
     loading.value = false
   }, 1000)
@@ -189,6 +176,21 @@ onMounted(() => {
   <v-container fluid>
     <template v-if="!loading">
       <v-row>
+        <v-col cols="12">
+          <v-card
+            width="300"
+            title="Atalhos"
+          >
+            <template v-slot:text>
+              <div class="d-flex flex-column ga-2">
+                <div class="d-flex align-center justify-space-between">
+                  Acessar visão TI:
+                  <v-hotkey display-mode="icon" keys="ctrl+k"></v-hotkey>
+                </div>
+              </div>
+            </template>
+          </v-card>
+        </v-col>
         <v-col cols="12">
           <v-expansion-panels>
             <v-expansion-panel>
@@ -348,6 +350,7 @@ onMounted(() => {
                       <v-text-field
                         controlVariant="split"
                         density="compact"
+                        type="number"
                         v-model="shelf[index].height"
                         @update:model-value="updateProductsPosition(index)"
                         hide-details
@@ -358,6 +361,7 @@ onMounted(() => {
                       <v-text-field
                         controlVariant="split"
                         density="compact"
+                        type="number"
                         v-model="shelf[index].width"
                         hide-details
                       />
@@ -367,6 +371,7 @@ onMounted(() => {
                       <v-text-field
                         controlVariant="split"
                         density="compact"
+                        type="number"
                         v-model="shelf[index].tickness"
                         hide-details
                       />
@@ -421,6 +426,7 @@ onMounted(() => {
                 >
                   <template v-slot:prepend="{ item, isOpen }">
                     <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
+                      <v-img v-else :src="item.previewUrl" width="50" height="50"></v-img>
                   </template>
 
                   <template v-slot:title="{ item }">
@@ -429,8 +435,12 @@ onMounted(() => {
                       :draggable="!item.children"
                       @click.stop="addProduct(item)"
                     >
-                      <span class="text-subtitle-1">{{ item.title }}</span><br>
-                      <span v-if="item.width && item.height" class="text-caption">{{ item.width }}cm/{{ item.height }}cm</span>
+                      <p :class="item.label === 'category'? 'text-subtitle-1' : 'text-subtitle-1 custom-line'">
+                        {{ item.title }}
+                      </p>
+                      <p v-if="item.width && item.height" class="text-caption font-italic">
+                        {{ item.width }}cm/{{item.height }}cm
+                      </p>
                     </div>
                   </template>
                 </v-treeview>
@@ -450,49 +460,6 @@ onMounted(() => {
                 </v-btn>
               </v-card>
             </v-col>
-            <!--            <v-col cols="12">
-                          <v-card color="white" :disabled="shelf.length === 0">
-                            <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o Elemento decorativo"
-                                          single-line
-                                          prepend-inner-icon="mdi-magnify" hide-details/>
-                            <v-list lines="one" bg-color="transparent">
-                              <v-list-item
-                                v-for="product in productList"
-                                :key="product.ean"
-                                :title="product.subcategory"
-                                :subtitle="product.category"
-                                :prepend-avatar="product.previewUrl"
-                                append-icon="mdi-plus"
-                                @click.stop="addProduct(product)"
-                              >
-                                <template v-slot:prepend>
-                                  <v-avatar
-                                    color="grey"
-                                    rounded="0"
-                                    size="40"
-                                  >
-                                    <v-img v-if="product.previewUrl" :src="product.previewUrl"></v-img>
-                                    <v-icon v-else color="error">mdi-cancel</v-icon>
-                                  </v-avatar>
-                                </template>
-                              </v-list-item>
-                            </v-list>
-                            <v-btn block
-                                   prepend-icon="mdi-plus"
-                                   color="success"
-                                   @click.stop="addProductModel = true"
-
-                            >Adicionar produto
-                            </v-btn>
-
-                            <v-btn block
-                                   prepend-icon="mdi-import"
-                                   color="warning"
-                                   @click.stop="importProductModel = true"
-                            >Exportar produto
-                            </v-btn>
-                          </v-card>
-                        </v-col>-->
           </v-row>
         </v-col>
         <v-col cols="9" class="overflow-x-auto">
@@ -515,49 +482,12 @@ onMounted(() => {
                      @edit-shelf="editShelf"/>
 
   <import-product-dialog v-model="importProductModel" @update-products="saveProduct"/>
+
+  <result-dialog v-model="resultModel" :products="productList" :shelf="shelf"/>
 </template>
 
 <style scoped>
-.image-item {
-  transition: box-shadow 0.2s;
-}
-
-.polka-dot {
-  position: relative;
-  background-color: #fcfcfd;
-  background-image: radial-gradient(#dfdfe4 2px, transparent 2px);
-  background-size: 15px 15px;
-}
-
-.polka-dot::before {
-  position: absolute;
-  inset: 0;
-  font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
-  font-size: 40px;
-  font-weight: bold;
-  color: rgba(0, 0, 0, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.polka-dot > * {
-  position: relative;
-  z-index: 1;
-}
-
-.droppable-area {
-  position: relative;
-}
-
-.imageless {
-  position: absolute;
-  top: 80px;
-  right: 0;
-  width: 200px;
-  height: 100px;
-  border: 3px solid black;
+.custom-line{
+  line-height: 1.0;
 }
 </style>

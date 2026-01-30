@@ -128,12 +128,14 @@ function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
   for (const currentShelfProduct of currentShelfProducts) {
     widthAcummulated += currentShelfProduct.width
   }
+  console.log(`${productWidth + widthAcummulated} é maior que ${currentShelfWidth}`)
   return (productWidth + widthAcummulated) > currentShelfWidth;
 
 }
 
 function onDragStart(item, itemIndex, shelfIndex, event) {
   const rect = event.target.getBoundingClientRect();
+  console.log(rect)
   const {widthPx, heightPx} = cmToPixel(item.height, item.width);
   dragShow.value[shelfIndex] = true
 
@@ -147,7 +149,7 @@ function onDragStart(item, itemIndex, shelfIndex, event) {
     offsetY: event.clientY - rect.top,
     offsetX: event.clientX - rect.left
   }
-
+  event.dataTransfer.effectAllowed = 'move';
 }
 
 function doFormatAlign(align, shelfIndex) {
@@ -379,7 +381,7 @@ function onFocusOut() {
               </v-list-item>
             </v-list>
           </v-menu>
-          <div class="position-absolute" v-for="(imageItem, itemIndex) in shelfItem.products"
+          <div class="position-absolute cursor-move image-item menuContext" v-for="(imageItem, itemIndex) in shelfItem.products"
                @dragstart.stop="onDragStart(imageItem, itemIndex, index, $event)"
                @dragend.stop="onDragEnd"
                @drop="onDragEnd"
@@ -388,26 +390,18 @@ function onFocusOut() {
                @focusout="onFocusOut"
                draggable="true"
                tabindex="0"
+               :style="{
+                top: `${imageItem.y}px`,
+                left: `${imageItem.x}px`,
+                height: `${cmToPixel(imageItem.height, imageItem.width).heightPx}px`,
+                width: `${cmToPixel(imageItem.height, imageItem.width).widthPx}px`,
+                'background-color': showAssets && imageItem.previewUrl ? null : stringToColour(imageItem.ean),
+                border: showAssets && imageItem.previewUrl ? null : '3px solid black'
+               }"
           >
             <v-img
-              class="cursor-move image-item menuContext"
-              v-if="showAssets && imageItem.previewUrl"
-              :src="imageItem.previewUrl"
-              :height="cmToPixel(imageItem.height, imageItem.width).heightPx"
-              :width="cmToPixel(imageItem.height, imageItem.width).widthPx"
-              :style="{top: `${imageItem.y}px`,left: `${imageItem.x}px`}"
-            />
-            <v-sheet
-              v-else
-              class="cursor-move image-item position-absolute imageless menuContext"
-              :height="cmToPixel(imageItem.height, imageItem.width).heightPx"
-              :width="cmToPixel(imageItem.height, imageItem.width).widthPx"
-              :style="{top: `${imageItem.y}px`,left: `${imageItem.x}px`, 'background-color': stringToColour(imageItem.ean)}"
-            />
-            <div
-              v-if="dragShow[index]"
-              :style="previewStyle"
-              class="drag-preview-ghost"
+              v-if="showAssets"
+              :src="imageItem?.previewUrl"
             />
           </div>
           <v-menu
@@ -504,9 +498,6 @@ function onFocusOut() {
 }
 
 .imageless {
-  position: absolute;
-  width: 200px;
-  height: 100px;
   border: 3px solid black;
 }
 </style>
