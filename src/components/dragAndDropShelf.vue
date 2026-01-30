@@ -156,7 +156,7 @@ function doFormatAlign(align, shelfIndex) {
   addMagicSound()
 
   const currentShelf = shelf.value[shelfIndex]
-  const shelfWidth = cmToPixel(null, standSize.value.width).widthPx
+  const shelfWidth = cmToPixel(null, shelf.value[shelfIndex].width).widthPx
 
   const sortedProducts = [...currentShelf.products].sort(
     (a, b) => a.x - b.x
@@ -316,81 +316,83 @@ function onFocusOut() {
 </script>
 
 <template>
-  <v-card v-if="shelf && shelf.length > 0" class="polka-dot pa-0 ma-0">
-    <v-card-item class="pa-0">
-      <template v-for="(shelfItem, index) in shelf">
-        <v-btn-toggle density="compact" border divided>
-          <v-btn size="x-small" @click.stop="doFormatAlign('left', index)">
-            <span class="hidden-sm-and-down">Left</span>
+  <template v-for="(shelfItem, index) in shelf" v-if="shelf && shelf.length > 0">
+    <v-sheet :width="cmToPixel(null, shelfItem.width).widthPx + 'px'" class="polka-dot pa-0 ma-0">
+      <v-btn-toggle density="compact" border divided>
+        <v-btn size="x-small" @click.stop="doFormatAlign('left', index)">
+          <span class="hidden-sm-and-down">Left</span>
 
-            <v-icon end>
-              mdi-format-align-left
-            </v-icon>
-          </v-btn>
+          <v-icon end>
+            mdi-format-align-left
+          </v-icon>
+        </v-btn>
 
-          <v-btn size="x-small" @click.stop="doFormatAlign('center', index)">
-            <span class="hidden-sm-and-down">Center</span>
+        <v-btn size="x-small" @click.stop="doFormatAlign('center', index)">
+          <span class="hidden-sm-and-down">Center</span>
 
-            <v-icon end>
-              mdi-format-align-center
-            </v-icon>
-          </v-btn>
+          <v-icon end>
+            mdi-format-align-center
+          </v-icon>
+        </v-btn>
 
-          <v-btn size="x-small" @click.stop="doFormatAlign('right', index)">
-            <span class="hidden-sm-and-down">Right</span>
+        <v-btn size="x-small" @click.stop="doFormatAlign('right', index)">
+          <span class="hidden-sm-and-down">Right</span>
 
-            <v-icon end>
-              mdi-format-align-right
-            </v-icon>
-          </v-btn>
+          <v-icon end>
+            mdi-format-align-right
+          </v-icon>
+        </v-btn>
 
-          <v-btn size="x-small" @click.stop="doFormatAlign('justify', index)">
-            <span class="hidden-sm-and-down">Justify</span>
+        <v-btn size="x-small" @click.stop="doFormatAlign('justify', index)">
+          <span class="hidden-sm-and-down">Justify</span>
 
-            <v-icon end>
-              mdi-format-align-justify
-            </v-icon>
-          </v-btn>
-        </v-btn-toggle>
-        <div class="flex-nowrap droppable-area menu-area"
-             @contextmenu.prevent.stop="openShelfMenu(index, $event)"
-             @drop="onDrop(index, $event, cmToPixel(shelfItem.height, null).heightPx)"
-             @dragover.prevent="onDragOver($event, cmToPixel(shelfItem.height, null).heightPx, index)"
-             :style="{'min-height': cmToPixel(shelfItem.height, null).heightPx + 'px'}">
-          <v-menu
-            v-model="shelfMenu"
-            location="end"
-            scroll-strategy="close"
-            :target="[selectedShelf.x, selectedShelf.y]"
+          <v-icon end>
+            mdi-format-align-justify
+          </v-icon>
+        </v-btn>
+      </v-btn-toggle>
+      <div class="flex-nowrap droppable-area"
+           @contextmenu.prevent.stop="openShelfMenu(index, $event)"
+           @drop="onDrop(index, $event, cmToPixel(shelfItem.height, null).heightPx)"
+           @dragover.prevent="onDragOver($event, cmToPixel(shelfItem.height, null).heightPx, index)"
+           :style="{
+               'min-height': cmToPixel(shelfItem.height, null).heightPx + 'px',
+             }">
+        <v-menu
+          v-model="shelfMenu"
+          location="end"
+          scroll-strategy="close"
+          :target="[selectedShelf.x, selectedShelf.y]"
+        >
+          <v-list
+            class="py-0"
+            density="compact"
+            slim
+            nav
           >
-            <v-list
-              class="py-0"
-              density="compact"
-              slim
-              nav
-            >
-              <v-list-item density="compact" @click="actionShelf('edit')">
-                <v-list-item-title>
-                  Editar Prateleira
-                </v-list-item-title>
-              </v-list-item>
-              <v-list-item density="compact" @click="actionShelf('delete')">
-                <v-list-item-title>
-                  Deletar Prateleira
-                </v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-          <div class="position-absolute cursor-move image-item menuContext" v-for="(imageItem, itemIndex) in shelfItem.products"
-               @dragstart.stop="onDragStart(imageItem, itemIndex, index, $event)"
-               @dragend.stop="onDragEnd"
-               @drop="onDragEnd"
-               @contextmenu.prevent.stop="openMenu(itemIndex, index, $event)"
-               @focus="onFocus(imageItem)"
-               @focusout="onFocusOut"
-               draggable="true"
-               tabindex="0"
-               :style="{
+            <v-list-item density="compact" @click="actionShelf('edit')">
+              <v-list-item-title>
+                Editar Prateleira
+              </v-list-item-title>
+            </v-list-item>
+            <v-list-item density="compact" @click="actionShelf('delete')">
+              <v-list-item-title>
+                Deletar Prateleira
+              </v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+        <div class="position-absolute cursor-move image-item menuContext"
+             v-for="(imageItem, itemIndex) in shelfItem.products"
+             @dragstart.stop="onDragStart(imageItem, itemIndex, index, $event)"
+             @dragend.stop="onDragEnd"
+             @drop="onDragEnd"
+             @contextmenu.prevent.stop="openMenu(itemIndex, index, $event)"
+             @focus="onFocus(imageItem)"
+             @focusout="onFocusOut"
+             draggable="true"
+             tabindex="0"
+             :style="{
                 top: `${imageItem.y}px`,
                 left: `${imageItem.x}px`,
                 height: `${cmToPixel(imageItem.height, imageItem.width).heightPx}px`,
@@ -398,42 +400,41 @@ function onFocusOut() {
                 'background-color': showAssets && imageItem.previewUrl ? null : stringToColour(imageItem.ean),
                 border: showAssets && imageItem.previewUrl ? null : '3px solid black'
                }"
-          >
-            <v-img
-              v-if="showAssets"
-              :src="imageItem?.previewUrl"
-            />
-          </div>
-          <v-menu
-            v-model="menu"
-            location="end"
-            scroll-strategy="close"
-            :target="menuTarget"
-          >
-            <v-list
-              class="py-0"
-              density="compact"
-              slim
-              nav
-            >
-              <v-list-item density="compact" @click="action('edit')">
-                <v-list-item-title>
-                  Editar
-                </v-list-item-title>
-              </v-list-item>
-              <v-list-item density="compact" @click="action('delete')">
-                <v-list-item-title>
-                  Excluir
-                </v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
+        >
+          <v-img
+            v-if="showAssets"
+            :src="imageItem?.previewUrl"
+          />
         </div>
-        <v-divider :thickness="cmToPixel(shelfItem.tickness, null).heightPx" :color="shelfItem.color"
-                   variant="solid" class="border-opacity-100"/>
-      </template>
-    </v-card-item>
-  </v-card>
+        <v-menu
+          v-model="menu"
+          location="end"
+          scroll-strategy="close"
+          :target="menuTarget"
+        >
+          <v-list
+            class="py-0"
+            density="compact"
+            slim
+            nav
+          >
+            <v-list-item density="compact" @click="action('edit')">
+              <v-list-item-title>
+                Editar
+              </v-list-item-title>
+            </v-list-item>
+            <v-list-item density="compact" @click="action('delete')">
+              <v-list-item-title>
+                Excluir
+              </v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+      </div>
+      <v-divider :thickness="cmToPixel(shelfItem.tickness, null).heightPx" :color="shelfItem.color"
+                 variant="solid" class="border-opacity-100"/>
+    </v-sheet>
+  </template>
 
   <v-card v-else>
     <v-empty-state icon="mdi-cart-off">

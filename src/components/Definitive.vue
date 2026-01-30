@@ -55,7 +55,7 @@ const shelf = ref([
     mobiliaryElement: 'Prateleira',
     height: 40,
     depth: 0,
-    width: 40,
+    width: 150,
     tickness: 2,
     color: '#A3C4BC',
     products: []
@@ -64,7 +64,7 @@ const shelf = ref([
     mobiliaryElement: 'Prateleira',
     height: 40,
     depth: 0,
-    width: 40,
+    width: 150,
     tickness: 2,
     color: '#E9C46A',
     products: []
@@ -108,12 +108,12 @@ function canAddShelf(newShelfHeight) {
   return true
 }
 
-function addProduct(productItem) {
+function addProduct(productItem, index = 0) {
   if (productItem.label === 'category') return
   const shelfRef = shelf.value[0]
   const {width, height} = productItem
 
-  if (canAddProduct(shelfRef.products, standSize.value.width, width)) {
+  if (canAddProduct(shelfRef.products, shelf.value[index].width, width)) {
     showSnackbar('Limite atingido, não é possível adicionar mais produtos')
     return
   }
