@@ -1,13 +1,15 @@
 <script setup>
 import cmToPixel from "@/plugins/helper/cmToPixel.js";
 import {stringToColour} from "@/plugins/helper/stringToColour.js";
-import {computed, reactive, ref, watch} from "vue";
+import {computed, onMounted, reactive, ref, watch} from "vue";
 import {showSnackbar} from "@/plugins/helper/customSnackbar.js";
 import {useSound} from "@vueuse/sound";
 import bonk from "@/assets/sounds/bonk.mp3";
 import magic from "@/assets/sounds/magic.mp3";
-
-const props = defineProps({
+import Panzoom from '@panzoom/panzoom'
+const panzoomRef = ref(null)
+const allowPanning = defineModel('allowPanning')
+defineProps({
   showAssets: {
     default: false,
     required: true
@@ -134,21 +136,25 @@ function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
 }
 
 function onDragStart(item, itemIndex, shelfIndex, event) {
-  const rect = event.target.getBoundingClientRect();
-  console.log(rect)
-  const {widthPx, heightPx} = cmToPixel(item.height, item.width);
-  dragShow.value[shelfIndex] = true
+  const element = event.target.closest('.image-item') || event.target
+  const rect = element.getBoundingClientRect()
 
+  const {widthPx, heightPx} = cmToPixel(item.height, item.width);
+  const currentScale = panzoomRef.value.getScale() // Pega o zoom atual
+
+  dragShow.value[shelfIndex] = true
   dragPreview.width = widthPx;
   dragPreview.height = heightPx;
   dragPreview.ean = item.ean;
+
   draggedItem.value = {
     item: item,
     index: itemIndex,
     shelfIndex: shelfIndex,
-    offsetY: event.clientY - rect.top,
-    offsetX: event.clientX - rect.left
+    offsetX: (event.clientX - rect.left) / currentScale,
+    offsetY: (event.clientY - rect.top) / currentScale
   }
+
   event.dataTransfer.effectAllowed = 'move';
 }
 
@@ -213,6 +219,11 @@ function doFormatAlign(align, shelfIndex) {
   }
 }
 
+function getScale(element) {
+  const rect = element.getBoundingClientRect()
+  return rect.width / element.offsetWidth
+}
+
 function onDrop(index, event, shelfHeight = 0) {
   if (!draggedItem.value.item) return
 
@@ -244,14 +255,15 @@ function onDrop(index, event, shelfHeight = 0) {
   const container = event.currentTarget
   const containerRect = container.getBoundingClientRect()
   const removedItemHeight = cmToPixel(removedItem.height, null).heightPx
-
-  const newX = event.clientX - containerRect.left - draggedItem.value.offsetX
-  if (hasHorizontalCollision(destShelf.products, removedItem, newX)) {
+  const currentScale = panzoomRef.value.getScale()
+  const mouseRelX = (event.clientX - containerRect.left) / currentScale
+  const finalX = mouseRelX - draggedItem.value.offsetX
+  if (hasHorizontalCollision(destShelf.products, removedItem, finalX)) {
     showSnackbar('Não é possível soltar o produto sobre outro')
     return
   }
 
-  removedItem.x = Math.max(0, newX)
+  removedItem.x = finalX
   removedItem.y = shelfHeight - removedItemHeight
 
   let insertIndex = index
@@ -313,9 +325,32 @@ function onFocus(currentImage) {
 function onFocusOut() {
   currentFocus.value = null
 }
+
+onMounted(() => {
+  enableMoveCanva()
+})
+
+function enableMoveCanva(){
+  let elem = document.getElementById('canvas');
+  panzoomRef.value = Panzoom(elem, {
+    disablePan: !allowPanning.value,
+    maxScale: 5,
+    excludeClass: 'exclude-area'
+  })
+  elem.parentElement.addEventListener('wheel', panzoomRef.value.zoomWithWheel)
+}
+
+watch(allowPanning, async (newValue) => {
+  if (!panzoomRef.value) return
+
+  panzoomRef.value.setOptions({
+    disablePan: !newValue,
+  })
+})
 </script>
 
 <template>
+  <div id="canvas">
   <template v-for="(shelfItem, index) in shelf" v-if="shelf && shelf.length > 0">
     <v-sheet :width="cmToPixel(null, shelfItem.width).widthPx + 'px'" class="polka-dot pa-0 ma-0">
       <v-btn-toggle density="compact" border divided>
@@ -382,8 +417,9 @@ function onFocusOut() {
             </v-list-item>
           </v-list>
         </v-menu>
-        <div class="position-absolute cursor-move image-item menuContext"
+        <div class="position-absolute cursor-move image-item menuContext exclude-area"
              v-for="(imageItem, itemIndex) in shelfItem.products"
+             @click.stop="productClick(imageItem, itemIndex, index, $event)"
              @dragstart.stop="onDragStart(imageItem, itemIndex, index, $event)"
              @dragend.stop="onDragEnd"
              @drop="onDragEnd"
@@ -461,6 +497,7 @@ function onFocusOut() {
       </template>
     </v-empty-state>
   </v-card>
+  </div>
 </template>
 
 <style scoped>
@@ -496,9 +533,5 @@ function onFocusOut() {
 
 .droppable-area {
   position: relative;
-}
-
-.imageless {
-  border: 3px solid black;
 }
 </style>

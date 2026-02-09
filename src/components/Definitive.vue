@@ -1,5 +1,5 @@
 <script setup>
-import {onMounted, ref} from "vue";
+import {onMounted, reactive, ref} from "vue";
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
 import cmToPixel from "@/plugins/helper/cmToPixel.js";
 import productsDb from '@/plugins/database/products.json'
@@ -8,22 +8,19 @@ import EditProductDialog from "@/components/dialog/editProductDialog.vue";
 import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
 import {useSound} from '@vueuse/sound'
 import minecraftClick from '@/assets/sounds/minecraftClick.mp3'
-import magic from '@/assets/sounds/magic.mp3'
 import ImportProductDialog from "@/components/dialog/importProductDialog.vue";
 import DragAndDropShelf from "@/components/dragAndDropShelf.vue";
 import ResultDialog from "@/components/dialog/resultDialog.vue";
 import {showSnackbar} from "@/plugins/helper/customSnackbar.js";
-
+import gsap from 'gsap'
+import oldMan from '@/assets/oldMan.png'
 const {play: addProductSound} = useSound(minecraftClick, {
   volume: 1,
   interrupt: true
 })
-
-const {play: addMagicSound} = useSound(magic, {
-  volume: 0.5,
-  interrupt: true
+const tweened = reactive({
+  number: 0
 })
-
 const headers = [
   {title: 'Nivel', key: 'level', align: 'start'},
   {title: 'Elemento do mobiliário', key: 'mobiliaryElement'},
@@ -34,6 +31,7 @@ const headers = [
   {title: 'Cor', key: 'color', align: 'end', width: 50},
   {title: 'Action', key: 'action', align: 'end', width: 50},
 ]
+const enablePanning = ref(true)
 const resultModel = ref(false)
 const shelfIndexToDelete = ref(null)
 const loading = ref(false)
@@ -49,7 +47,6 @@ const standSize = ref({
   width: 92
 })
 
-const modules = ref({})
 const shelf = ref([
   {
     mobiliaryElement: 'Prateleira',
@@ -168,7 +165,9 @@ onMounted(() => {
   })
   setTimeout(() => {
     loading.value = false
-  }, 1000)
+    gsap.to(tweened, {duration: 2, number: Number(1239123912) || 0})
+  }, 2000)
+
 })
 </script>
 
@@ -177,128 +176,30 @@ onMounted(() => {
     <template v-if="!loading">
       <v-row>
         <v-col cols="12">
-          <v-card
-            width="300"
-            title="Atalhos"
+          <v-alert
+            density="compact"
+            title="Ta esperando o que meu fi?"
+            type="success"
+            closable
           >
-            <template v-slot:text>
-              <div class="d-flex flex-column ga-2">
-                <div class="d-flex align-center justify-space-between">
-                  Acessar visão TI:
-                  <v-hotkey display-mode="icon" keys="ctrl+k"></v-hotkey>
-                </div>
-              </div>
-            </template>
-          </v-card>
+            <v-row class="d-flex justify-start align-center">
+              <v-col cols="1">
+                <v-img
+                  class="spin"
+                  :src="oldMan"
+                   height="90"/>
+              </v-col>
+              <v-col>
+                <p>Ja somos mais de <span class="text-h4 font-weight-black rainbow-text">{{
+                    tweened.number.toLocaleString('pt-br')
+                  }}</span> usuários
+                  ativos</p>
+              </v-col>
+            </v-row>
+          </v-alert>
         </v-col>
         <v-col cols="12">
           <v-expansion-panels>
-            <v-expansion-panel>
-              <v-expansion-panel-title v-slot="{ expanded }">
-                <v-row no-gutters>
-                  <v-col class="d-flex justify-start" cols="4">
-                    Caracteristicas do móvel
-                  </v-col>
-                  <v-col
-                    class="text--secondary"
-                    cols="8"
-                  >
-                    <v-fade-transition leave-absolute>
-                      <span v-if="expanded">Ajuste seu móvel como desejar</span>
-                      <v-row
-                        v-else
-                        style="width: 100%"
-                        no-gutters
-                      >
-                        <v-col class="d-flex justify-start" cols="6">
-                          Rock music
-                        </v-col>
-                      </v-row>
-                    </v-fade-transition>
-                  </v-col>
-                </v-row>
-              </v-expansion-panel-title>
-              <v-expansion-panel-text>
-                <v-row dense>
-                  <v-col
-                    cols="12"
-                    md="4"
-                    sm="6"
-                  >
-                    <v-number-input
-                      density="compact"
-                      v-model="modules.qtd"
-                      label="N° de Módulos"
-                      required
-                    ></v-number-input>
-                  </v-col>
-
-                  <v-col
-                    cols="12"
-                    md="4"
-                    sm="6"
-                  >
-                    <v-number-input
-                      density="compact"
-                      label="Altura"
-                      required
-                    ></v-number-input>
-                  </v-col>
-
-                  <v-col
-                    cols="12"
-                    md="4"
-                    sm="6"
-                  >
-                    <v-number-input
-                      density="compact"
-                      label="Largura"
-                      v-model="modules.width"
-                      required
-                    ></v-number-input>
-                  </v-col>
-
-                  <v-col
-                    cols="12"
-                    md="4"
-                    sm="6"
-                  >
-                    <v-number-input
-                      density="compact"
-                      label="Base"
-                      v-model="modules.base"
-                      required
-                    ></v-number-input>
-                  </v-col>
-
-                  <v-col
-                    cols="12"
-                    md="4"
-                    sm="6"
-                  >
-                    <v-number-input
-                      density="compact"
-                      label="Profundidade"
-                      v-model="modules.depth"
-                      required
-                    ></v-number-input>
-                  </v-col>
-
-                  <v-col
-                    cols="12"
-                    md="4"
-                    sm="6"
-                  >
-                    <v-number-input
-                      density="compact"
-                      label="Linear ao solo"
-                      v-model="modules.linear"
-                      required
-                    ></v-number-input>
-                  </v-col>
-                </v-row>
-              </v-expansion-panel-text>
-            </v-expansion-panel>
             <v-expansion-panel>
               <v-expansion-panel-title v-slot="{ expanded }">
                 <v-row no-gutters>
@@ -342,7 +243,7 @@ onMounted(() => {
                         </v-btn>
                       </v-toolbar>
                     </template>
-                    <template v-slot:item.level="{ value, index }">
+                    <template v-slot:item.level="{ index }">
                       {{ index + 1 }}
                     </template>
 
@@ -383,7 +284,7 @@ onMounted(() => {
                           <div :style="{'background-color': value}" class="pa-2" v-bind="activatorProps"/>
                         </template>
 
-                        <template v-slot:default="{ isActive }">
+                        <template v-slot:default>
                           <v-card title="Dialog">
                             <v-card-text>
                               <v-color-picker hide-inputs v-model="shelf[index].color"></v-color-picker>
@@ -404,7 +305,14 @@ onMounted(() => {
           </v-expansion-panels>
         </v-col>
         <v-col cols="12">
-          <v-switch label="Exibir Ilustrações" hide-details color="primary" v-model="showAssets"/>
+          <v-row>
+            <v-col>
+              <v-switch label="Exibir Ilustrações" hide-details color="primary" v-model="showAssets"/>
+            </v-col>
+            <v-col>
+              <v-switch label="Mover tela" hide-details color="primary" v-model="enablePanning"/>
+            </v-col>
+          </v-row>
         </v-col>
         <v-col cols="3">
           <v-row>
@@ -424,9 +332,9 @@ onMounted(() => {
                   open-on-click
                   rounded
                 >
-                  <template v-slot:prepend="{ item, isOpen }">
+                  <template v-slot:prepend="{ item }">
                     <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
-                      <v-img v-else :src="item.previewUrl" width="50" height="50"></v-img>
+                    <v-img v-else :src="item.previewUrl" width="50" height="50"></v-img>
                   </template>
 
                   <template v-slot:title="{ item }">
@@ -439,7 +347,7 @@ onMounted(() => {
                         {{ item.title }}
                       </p>
                       <p v-if="item.width && item.height" class="text-caption font-italic">
-                        {{ item.width }}cm/{{item.height }}cm
+                        {{ item.width }}cm/{{ item.height }}cm
                       </p>
                     </div>
                   </template>
@@ -462,8 +370,8 @@ onMounted(() => {
             </v-col>
           </v-row>
         </v-col>
-        <v-col cols="9" class="overflow-x-auto">
-          <drag-and-drop-shelf v-model:shelf="shelf" :show-assets="showAssets"/>
+        <v-col cols="9">
+          <drag-and-drop-shelf v-model:shelf="shelf" v-model:allowPanning="enablePanning" :show-assets="showAssets"/>
         </v-col>
       </v-row>
     </template>
@@ -487,7 +395,54 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.custom-line{
+.custom-line {
   line-height: 1.0;
+}
+
+.rainbow-text {
+  background: linear-gradient(
+    270deg,
+    #ff0000,
+    #ff9900,
+    #ffee00,
+    #33cc33,
+    #00ccff,
+    #6633ff,
+    #ff33cc
+  );
+  background-size: 400% 400%;
+
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+
+  animation: rainbow .5s ease infinite;
+}
+
+@keyframes rainbow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+
+.spin {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

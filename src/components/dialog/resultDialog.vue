@@ -1,6 +1,6 @@
 <script setup>
 const model = defineModel()
-const props = defineProps({
+defineProps({
   products: {
     default: []
   },
@@ -19,7 +19,7 @@ const props = defineProps({
       <v-card-text>
         <v-expansion-panels color="error">
           <v-expansion-panel>
-            <v-expansion-panel-title v-slot="{ expanded }">
+            <v-expansion-panel-title>
               Products
             </v-expansion-panel-title>
             <v-expansion-panel-text>
@@ -32,7 +32,7 @@ const props = defineProps({
             </v-expansion-panel-text>
           </v-expansion-panel>
           <v-expansion-panel>
-            <v-expansion-panel-title v-slot="{ expanded }">
+            <v-expansion-panel-title>
               Shelf
             </v-expansion-panel-title>
             <v-expansion-panel-text>
