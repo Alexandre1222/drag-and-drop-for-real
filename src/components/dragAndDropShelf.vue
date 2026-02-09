@@ -127,9 +127,6 @@ function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
   for (const currentShelfProduct of currentShelfProducts) {
     widthAcummulated += currentShelfProduct.width
   }
-  for (const currentShelfProduct of currentShelfProducts) {
-    widthAcummulated += currentShelfProduct.width
-  }
   console.log(`${productWidth + widthAcummulated} é maior que ${currentShelfWidth}`)
   return (productWidth + widthAcummulated) > currentShelfWidth;
 
@@ -244,7 +241,7 @@ function onDrop(index, event, shelfHeight = 0) {
   const isDifferentShelf = sourceIndex !== index
   if (
     isDifferentShelf &&
-    canAddProduct(destShelf.products, standSize.value.width, draggedProduct.width)
+    canAddProduct(destShelf.products, destShelf.width, draggedProduct.width)
   ) {
     showSnackbar(`Limite atingido não é possivel adicionar mais produtos`)
     return
