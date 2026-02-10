@@ -107,27 +107,55 @@ function canAddShelf(newShelfHeight) {
 
 function addProduct(productItem, index = 0) {
   if (productItem.label === 'category') return
-  const shelfRef = shelf.value[0]
-  const {width, height} = productItem
 
-  if (canAddProduct(shelfRef.products, shelf.value[index].width, width)) {
+  const shelfRef = shelf.value[index]
+  const { width, height } = productItem
+
+  const shelfWidthPx = cmToPixel(null, shelfRef.width).widthPx
+  const productWidthPx = cmToPixel(null, width).widthPx
+  const shelfHeightPx = cmToPixel(shelfRef.height, null).heightPx
+  const productHeightPx = cmToPixel(height, null).heightPx
+
+  if (canAddProduct(shelfRef.products, shelfRef.width, width)) {
     showSnackbar('Limite atingido, não é possível adicionar mais produtos')
     return
   }
-  addProductSound()
 
+  const sortedProducts = [...shelfRef.products].sort((a, b) => a.x - b.x)
+  let foundX = null
+
+  if (sortedProducts.length === 0) {
+    if (productWidthPx <= shelfWidthPx) foundX = 0
+  } else {
+    if (sortedProducts[0].x >= productWidthPx) {
+      foundX = 0
+    } else {
+      for (let i = 0; i < sortedProducts.length; i++) {
+        const current = sortedProducts[i]
+        const currentWidthPx = cmToPixel(null, current.width).widthPx
+        const candidateX = current.x + currentWidthPx
+
+        const nextX = (i + 1 < sortedProducts.length)
+          ? sortedProducts[i + 1].x
+          : shelfWidthPx
+
+        if (nextX - candidateX >= productWidthPx) {
+          foundX = candidateX
+          break;
+        }
+      }
+    }
+  }
+
+  if (foundX === null) {
+    showSnackbar('Não há espaço contínuo suficiente para encaixar este produto.')
+    return
+  }
+  addProductSound()
   const product = JSON.parse(JSON.stringify(productItem))
-  const shelfHeightPx = cmToPixel(shelfRef.height).heightPx
-  const productHeightPx = cmToPixel(height).heightPx
 
   product.position = shelfRef.products.length
-
-  const products = shelfRef.products
-  const lastProduct = products.at(-1)
-  product.x = lastProduct
-    ? lastProduct.x + cmToPixel(null, lastProduct.width).widthPx
-    : 0
-
+  product.x = foundX
   product.y = shelfHeightPx - productHeightPx
 
   shelfRef.products.push(product)
@@ -165,7 +193,6 @@ onMounted(() => {
   })
   setTimeout(() => {
     loading.value = false
-    gsap.to(tweened, {duration: 2, number: Number(1239123912) || 0})
   }, 2000)
 
 })
@@ -175,29 +202,6 @@ onMounted(() => {
   <v-container fluid>
     <template v-if="!loading">
       <v-row>
-        <v-col cols="12">
-          <v-alert
-            density="compact"
-            title="Ta esperando o que meu fi?"
-            type="success"
-            closable
-          >
-            <v-row class="d-flex justify-start align-center">
-              <v-col cols="1">
-                <v-img
-                  class="spin"
-                  :src="oldMan"
-                   height="90"/>
-              </v-col>
-              <v-col>
-                <p>Ja somos mais de <span class="text-h4 font-weight-black rainbow-text">{{
-                    tweened.number.toLocaleString('pt-br')
-                  }}</span> usuários
-                  ativos</p>
-              </v-col>
-            </v-row>
-          </v-alert>
-        </v-col>
         <v-col cols="12">
           <v-expansion-panels>
             <v-expansion-panel>
@@ -399,50 +403,4 @@ onMounted(() => {
   line-height: 1.0;
 }
 
-.rainbow-text {
-  background: linear-gradient(
-    270deg,
-    #ff0000,
-    #ff9900,
-    #ffee00,
-    #33cc33,
-    #00ccff,
-    #6633ff,
-    #ff33cc
-  );
-  background-size: 400% 400%;
-
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  color: transparent;
-
-  animation: rainbow .5s ease infinite;
-}
-
-@keyframes rainbow {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-
-.spin {
-  animation: spin 2s linear infinite;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
 </style>

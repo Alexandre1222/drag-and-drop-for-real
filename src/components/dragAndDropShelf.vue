@@ -7,6 +7,7 @@ import {useSound} from "@vueuse/sound";
 import bonk from "@/assets/sounds/bonk.mp3";
 import magic from "@/assets/sounds/magic.mp3";
 import Panzoom from '@panzoom/panzoom'
+import WelcomeDialog from "@/components/dialog/welcomeDialog.vue";
 const panzoomRef = ref(null)
 const allowPanning = defineModel('allowPanning')
 defineProps({
@@ -15,6 +16,7 @@ defineProps({
     required: true
   }
 })
+const welcomeDialogRef = ref(false)
 const {play: deleteSound} = useSound(bonk, {
   volume: 0.4,
   interrupt: true
@@ -27,10 +29,6 @@ const draggedItem = ref(null)
 const menu = ref(false)
 const shelf = defineModel("shelf")
 const selectedShelf = ref({x: 0, y: 0})
-const standSize = ref({
-  height: 160,
-  width: 92
-})
 
 const dragShow = ref([])
 const dragPreview = reactive([{
@@ -214,11 +212,6 @@ function doFormatAlign(align, shelfIndex) {
     product.x = position
     position += widthPx + gap
   }
-}
-
-function getScale(element) {
-  const rect = element.getBoundingClientRect()
-  return rect.width / element.offsetWidth
 }
 
 function onDrop(index, event, shelfHeight = 0) {
@@ -495,6 +488,7 @@ watch(allowPanning, async (newValue) => {
     </v-empty-state>
   </v-card>
   </div>
+  <welcome-dialog v-model="welcomeDialogRef"/>
 </template>
 
 <style scoped>
