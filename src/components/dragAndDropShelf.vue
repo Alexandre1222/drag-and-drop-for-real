@@ -16,7 +16,10 @@ defineProps({
     required: true
   }
 })
-const welcomeDialogRef = ref(true)
+defineExpose({
+  resetPosition
+})
+const welcomeDialogRef = ref(false)
 const {play: deleteSound} = useSound(bonk, {
   volume: 0.4,
   interrupt: true
@@ -335,20 +338,17 @@ function onMouseDown(event) {
   }
 }
 
-function onMouseUp(event) {
-  if (event.button === 1) {
-    panzoomRef.value.setOptions({
-      disablePan: false,
-    })
-  }
-}
-
 function onMouseLeave() {
   isPanningCanva.value = false;
   panzoomRef.value.setOptions({
     disablePan: false,
   })
 }
+
+function resetPosition() {
+  panzoomRef.value.reset()
+}
+
 </script>
 
 <template>
@@ -358,7 +358,7 @@ function onMouseLeave() {
        :style="{ cursor: isPanningCanva ? 'grabbing' : 'default' }"
   >
   <template v-for="(shelfItem, index) in shelf" v-if="shelf && shelf.length > 0">
-    <v-sheet :width="cmToPixel(null, shelfItem.width).widthPx + 'px'" class="polka-dot pa-0 ma-0">
+    <v-sheet  :width="cmToPixel(null, shelfItem.width).widthPx + 'px'" class="custom-border pa-0 ma-0">
       <v-btn-toggle density="compact" border divided>
         <v-btn size="x-small" @click.stop="doFormatAlign('left', index)">
           <span class="hidden-sm-and-down">Left</span>
@@ -512,33 +512,12 @@ function onMouseLeave() {
   transition: box-shadow 0.2s;
 }
 
-.polka-dot {
-  position: relative;
-  background-color: #fcfcfd;
-  background-image: radial-gradient(#dfdfe4 2px, transparent 2px);
-  background-size: 15px 15px;
-}
-
-.polka-dot::before {
-  position: absolute;
-  inset: 0;
-  font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
-  font-size: 40px;
-  font-weight: bold;
-  color: rgba(0, 0, 0, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.polka-dot > * {
-  position: relative;
-  z-index: 1;
-}
-
 .droppable-area {
   position: relative;
+}
+
+.custom-border {
+  border: 3px solid black;
+  background-color: rgba(0, 0, 0, 0.3);
 }
 </style>

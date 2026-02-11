@@ -21,6 +21,11 @@ const {play: addProductSound} = useSound(minecraftClick, {
 const tweened = reactive({
   number: 0
 })
+
+const showExpansion = ref(false)
+const showConfig = ref(false)
+const showProducts = ref(false)
+const dragAndDropRef = ref(null)
 const headers = [
   {title: 'Nivel', key: 'level', align: 'start'},
   {title: 'Elemento do mobiliário', key: 'mobiliaryElement'},
@@ -229,13 +234,107 @@ onMounted(() => {
     loading.value = false
   }, 2000)
 })
+
+function doHomeAction(actionMethod) {
+  switch (actionMethod) {
+    case 'hide-expansion':
+      showExpansion.value = !showExpansion.value
+      break;
+    case 'hide-config':
+      showConfig.value = !showConfig.value
+      break;
+    case 'hide-products':
+      showProducts.value = !showProducts.value
+      break;
+    case 'reset-position':
+      dragAndDropRef.value?.resetPosition()
+      break;
+    case 'hide-asset':
+      showAssets.value = !showAssets.value
+      break;
+  }
+}
 </script>
 
 <template>
   <v-container fluid>
     <template v-if="!loading">
       <v-row>
-        <v-col cols="12">
+        <v-col cols="12" class="pa-0">
+          <v-card flat border rounded="0">
+            <div class="d-flex px-2 py-2 overflow-x-auto">
+
+              <div class="d-flex flex-column justify-space-between align-center px-4">
+
+                <div class="d-flex mb-1 gap-1">
+                  <v-btn
+                    variant="text"
+                    :color="showExpansion ? 'success' : 'error'"
+                    icon="mdi-form-select"
+                    @click="doHomeAction('hide-expansion')"
+                    title="Ocultar Expansão"
+                  ></v-btn>
+                  <v-btn
+                    variant="text"
+                    :color="showProducts ? 'success' : 'error'"
+                    icon="mdi-shopping"
+                    @click="doHomeAction('hide-products')"
+                    title="Ocultar Produtos"
+                  ></v-btn>
+                  <v-btn
+                    variant="text"
+                    :color="showAssets ? 'success' : 'error'"
+                    :icon="showAssets ? 'mdi-eye-off' : 'mdi-eye'"
+                    @click="doHomeAction('hide-asset')"
+                    title="Exibir Ilustração"
+                  ></v-btn>
+                </div>
+
+                <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">
+          Exibição
+        </span>
+              </div>
+
+              <v-divider vertical class="my-1 mx-2"></v-divider>
+
+              <div class="d-flex flex-column justify-space-between align-center px-4">
+
+                <div class="d-flex mb-1">
+                  <v-btn-group density="compact" variant="outlined" divided>
+                    <v-btn
+                      variant="text"
+                      icon="mdi-restore"
+                      @click="doHomeAction('reset-position')"
+                      title="Ocultar Produtos"
+                    ></v-btn>
+                    <v-btn icon="mdi-format-align-left"></v-btn>
+                    <v-btn icon="mdi-format-align-center"></v-btn>
+                    <v-btn icon="mdi-format-align-right"></v-btn>
+                    <v-btn icon="mdi-format-align-justify"></v-btn>
+
+                  </v-btn-group>
+                </div>
+
+                <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">
+          Canvas
+        </span>
+              </div>
+
+              <v-divider vertical class="my-1 mx-2"></v-divider>
+
+              <div class="d-flex flex-column justify-space-between align-center px-4">
+                <div class="d-flex mb-1">
+                  <v-btn variant="text" icon="mdi-content-save-outline"></v-btn>
+                </div>
+                <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">
+          Ações
+        </span>
+              </div>
+
+            </div>
+          </v-card>
+        </v-col>
+        <v-col cols="12" v-if="showExpansion">
           <v-expansion-panels>
             <v-expansion-panel>
               <v-expansion-panel-title v-slot="{ expanded }">
@@ -343,71 +442,64 @@ onMounted(() => {
         </v-col>
         <v-col cols="12">
           <v-row>
-            <v-col>
-              <v-switch label="Exibir Ilustrações" hide-details color="primary" v-model="showAssets"/>
-            </v-col>
+          <v-col cols="2" v-if="showProducts">
+            <v-card color="white" :disabled="shelf.length === 0">
+              <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o produto"
+                            single-line
+                            prepend-inner-icon="mdi-magnify" hide-details/>
+              <v-treeview
+                :items="productList ?? []"
+                density="compact"
+                color="primary"
+                bg-color="white"
+                activatable
+                border
+                fluid
+                open-on-click
+                rounded
+              >
+                <template v-slot:prepend="{ item }">
+                  <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
+                  <v-img v-else :src="item.previewUrl" width="50" height="50"></v-img>
+                </template>
+
+                <template v-slot:title="{ item }">
+                  <div
+                    class="draggable-node"
+                    :draggable="!item.children"
+                    @click.stop="addProduct(item)"
+                  >
+                    <p :class="item.label === 'category'? 'text-subtitle-1' : 'text-subtitle-1 custom-line'">
+                      {{ item.title }}
+                    </p>
+                    <p v-if="item.width && item.height" class="text-caption font-italic">
+                      {{ item.width }}cm/{{ item.height }}cm
+                    </p>
+                  </div>
+                </template>
+              </v-treeview>
+              <v-btn block
+                     prepend-icon="mdi-plus"
+                     color="success"
+                     @click.stop="addProductModel = true"
+
+              >Adicionar produto
+              </v-btn>
+
+              <v-btn block
+                     prepend-icon="mdi-import"
+                     color="warning"
+                     @click.stop="importProductModel = true"
+              >Exportar produto
+              </v-btn>
+            </v-card>
+          </v-col>
+          <v-col>
+            <v-sheet ref="canvasRef" class="custom-border pa-2 polka-dot">
+              <drag-and-drop-shelf ref="dragAndDropRef" v-model:shelf="shelf" :show-assets="showAssets"/>
+            </v-sheet>
+          </v-col>
           </v-row>
-        </v-col>
-        <v-col cols="3">
-          <v-row>
-            <v-col cols="12">
-              <v-card color="white" :disabled="shelf.length === 0">
-                <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o produto"
-                              single-line
-                              prepend-inner-icon="mdi-magnify" hide-details/>
-                <v-treeview
-                  :items="productList ?? []"
-                  density="compact"
-                  color="primary"
-                  bg-color="white"
-                  activatable
-                  border
-                  fluid
-                  open-on-click
-                  rounded
-                >
-                  <template v-slot:prepend="{ item }">
-                    <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
-                    <v-img v-else :src="item.previewUrl" width="50" height="50"></v-img>
-                  </template>
-
-                  <template v-slot:title="{ item }">
-                    <div
-                      class="draggable-node"
-                      :draggable="!item.children"
-                      @click.stop="addProduct(item)"
-                    >
-                      <p :class="item.label === 'category'? 'text-subtitle-1' : 'text-subtitle-1 custom-line'">
-                        {{ item.title }}
-                      </p>
-                      <p v-if="item.width && item.height" class="text-caption font-italic">
-                        {{ item.width }}cm/{{ item.height }}cm
-                      </p>
-                    </div>
-                  </template>
-                </v-treeview>
-                <v-btn block
-                       prepend-icon="mdi-plus"
-                       color="success"
-                       @click.stop="addProductModel = true"
-
-                >Adicionar produto
-                </v-btn>
-
-                <v-btn block
-                       prepend-icon="mdi-import"
-                       color="warning"
-                       @click.stop="importProductModel = true"
-                >Exportar produto
-                </v-btn>
-              </v-card>
-            </v-col>
-          </v-row>
-        </v-col>
-        <v-col cols="9">
-          <div ref="canvasRef">
-            <drag-and-drop-shelf v-model:shelf="shelf" :show-assets="showAssets"/>
-          </div>
         </v-col>
       </v-row>
     </template>
@@ -435,4 +527,34 @@ onMounted(() => {
   line-height: 1.0;
 }
 
+.custom-border {
+  border: 2px solid white;
+}
+
+.polka-dot {
+  position: relative;
+  background-color: rgba(255, 255, 255, 1);
+  background-image: radial-gradient(#dfdfe4 2px, transparent 2px);
+
+  background-size: 15px 15px;
+}
+
+.polka-dot::before {
+  position: absolute;
+  inset: 0;
+  font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
+  font-size: 40px;
+  font-weight: bold;
+  color: rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.polka-dot > * {
+  position: relative;
+  z-index: 1;
+}
 </style>
