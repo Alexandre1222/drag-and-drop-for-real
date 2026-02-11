@@ -70,7 +70,6 @@ onMounted(() => {
     v-model="model"
     width="1400"
   >
-    Ta esperando o que meu fi?
     <v-card>
       <v-card-text>
         <v-row>
@@ -219,6 +218,12 @@ onMounted(() => {
   background-clip: text;
   color: transparent;
 
-  animation: rainbow .5s ease infinite;
+  animation: rainbow .8s linear infinite;
+}
+
+@keyframes rainbow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 </style>

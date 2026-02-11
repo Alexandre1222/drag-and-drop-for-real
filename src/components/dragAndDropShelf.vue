@@ -9,14 +9,14 @@ import magic from "@/assets/sounds/magic.mp3";
 import Panzoom from '@panzoom/panzoom'
 import WelcomeDialog from "@/components/dialog/welcomeDialog.vue";
 const panzoomRef = ref(null)
-const allowPanning = defineModel('allowPanning')
+const isPanningCanva = ref(false)
 defineProps({
   showAssets: {
     default: false,
     required: true
   }
 })
-const welcomeDialogRef = ref(false)
+const welcomeDialogRef = ref(true)
 const {play: deleteSound} = useSound(bonk, {
   volume: 0.4,
   interrupt: true
@@ -317,30 +317,46 @@ function onFocusOut() {
 }
 
 onMounted(() => {
-  enableMoveCanva()
-})
-
-function enableMoveCanva(){
   let elem = document.getElementById('canvas');
   panzoomRef.value = Panzoom(elem, {
-    disablePan: !allowPanning.value,
     maxScale: 5,
     excludeClass: 'exclude-area'
   })
   elem.parentElement.addEventListener('wheel', panzoomRef.value.zoomWithWheel)
+})
+
+function onMouseDown(event) {
+  if (event.button === 1) {
+    event.preventDefault();
+    isPanningCanva.value = true;
+    panzoomRef.value.setOptions({
+      disablePan: true,
+    })
+  }
 }
 
-watch(allowPanning, async (newValue) => {
-  if (!panzoomRef.value) return
+function onMouseUp(event) {
+  if (event.button === 1) {
+    panzoomRef.value.setOptions({
+      disablePan: false,
+    })
+  }
+}
 
+function onMouseLeave() {
+  isPanningCanva.value = false;
   panzoomRef.value.setOptions({
-    disablePan: !newValue,
+    disablePan: false,
   })
-})
+}
 </script>
 
 <template>
-  <div id="canvas">
+  <div id="canvas"
+       @click.middle="onMouseDown"
+       @mouseleave="onMouseLeave"
+       :style="{ cursor: isPanningCanva ? 'grabbing' : 'default' }"
+  >
   <template v-for="(shelfItem, index) in shelf" v-if="shelf && shelf.length > 0">
     <v-sheet :width="cmToPixel(null, shelfItem.width).widthPx + 'px'" class="polka-dot pa-0 ma-0">
       <v-btn-toggle density="compact" border divided>

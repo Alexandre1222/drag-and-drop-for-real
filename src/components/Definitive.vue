@@ -12,8 +12,8 @@ import ImportProductDialog from "@/components/dialog/importProductDialog.vue";
 import DragAndDropShelf from "@/components/dragAndDropShelf.vue";
 import ResultDialog from "@/components/dialog/resultDialog.vue";
 import {showSnackbar} from "@/plugins/helper/customSnackbar.js";
-import gsap from 'gsap'
-import oldMan from '@/assets/oldMan.png'
+import Panzoom from "@panzoom/panzoom";
+
 const {play: addProductSound} = useSound(minecraftClick, {
   volume: 1,
   interrupt: true
@@ -31,8 +31,8 @@ const headers = [
   {title: 'Cor', key: 'color', align: 'end', width: 50},
   {title: 'Action', key: 'action', align: 'end', width: 50},
 ]
-const enablePanning = ref(true)
-const resultModel = ref(false)
+const panzoomRef = ref(null)
+const canvasRef = ref(null)
 const shelfIndexToDelete = ref(null)
 const loading = ref(false)
 const importProductModel = ref(false)
@@ -109,7 +109,7 @@ function addProduct(productItem, index = 0) {
   if (productItem.label === 'category') return
 
   const shelfRef = shelf.value[index]
-  const { width, height } = productItem
+  const {width, height} = productItem
 
   const shelfWidthPx = cmToPixel(null, shelfRef.width).widthPx
   const productWidthPx = cmToPixel(null, width).widthPx
@@ -182,6 +182,40 @@ function updateProductsPosition(index) {
   }
 }
 
+function panningControl() {
+  const elem = canvasRef.value
+  console.log(elem)
+
+  panzoomRef.value = Panzoom(elem, {
+    disablePan: true,
+    cursor: 'default',
+  })
+
+  elem.parentElement.addEventListener('wheel', panzoomRef.value.zoomWithWheel)
+
+  elem.addEventListener('pointerdown', (event) => {
+    if (event.button === 1 || event.pointerType === 'touch') {
+
+      event.preventDefault()
+
+      panzoomRef.value.setOptions({
+        disablePan: false,
+        cursor: 'grabbing'
+      })
+
+    }
+  }, {capture: true})
+
+  window.addEventListener('pointerup', (event) => {
+    if (event.button === 1 || event.pointerType === 'touch') {
+      panzoomRef.value.setOptions({
+        disablePan: true,
+        cursor: 'default'
+      })
+    }
+  }, {capture: true})
+}
+
 onMounted(() => {
   loading.value = true
   productList.value = productsDb.items
@@ -194,7 +228,6 @@ onMounted(() => {
   setTimeout(() => {
     loading.value = false
   }, 2000)
-
 })
 </script>
 
@@ -313,9 +346,6 @@ onMounted(() => {
             <v-col>
               <v-switch label="Exibir Ilustrações" hide-details color="primary" v-model="showAssets"/>
             </v-col>
-            <v-col>
-              <v-switch label="Mover tela" hide-details color="primary" v-model="enablePanning"/>
-            </v-col>
           </v-row>
         </v-col>
         <v-col cols="3">
@@ -375,7 +405,9 @@ onMounted(() => {
           </v-row>
         </v-col>
         <v-col cols="9">
-          <drag-and-drop-shelf v-model:shelf="shelf" v-model:allowPanning="enablePanning" :show-assets="showAssets"/>
+          <div ref="canvasRef">
+            <drag-and-drop-shelf v-model:shelf="shelf" :show-assets="showAssets"/>
+          </div>
         </v-col>
       </v-row>
     </template>
