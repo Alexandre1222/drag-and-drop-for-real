@@ -26,6 +26,7 @@ const showExpansion = ref(false)
 const showConfig = ref(false)
 const showProducts = ref(false)
 const dragAndDropRef = ref(null)
+const decorativeElementDialog = ref(false)
 const headers = [
   {title: 'Nivel', key: 'level', align: 'start'},
   {title: 'Elemento do mobiliário', key: 'mobiliaryElement'},
@@ -36,7 +37,6 @@ const headers = [
   {title: 'Cor', key: 'color', align: 'end', width: 50},
   {title: 'Action', key: 'action', align: 'end', width: 50},
 ]
-const panzoomRef = ref(null)
 const canvasRef = ref(null)
 const shelfIndexToDelete = ref(null)
 const loading = ref(false)
@@ -46,6 +46,8 @@ const currentShelf = ref(null)
 const addProductModel = ref(false)
 const editProductModel = ref(false)
 const editShelfModel = ref(false)
+const selectedShelf = ref(null)
+const selectedProduct = ref(null)
 const productList = ref(null)
 const standSize = ref({
   height: 160,
@@ -187,40 +189,6 @@ function updateProductsPosition(index) {
   }
 }
 
-function panningControl() {
-  const elem = canvasRef.value
-  console.log(elem)
-
-  panzoomRef.value = Panzoom(elem, {
-    disablePan: true,
-    cursor: 'default',
-  })
-
-  elem.parentElement.addEventListener('wheel', panzoomRef.value.zoomWithWheel)
-
-  elem.addEventListener('pointerdown', (event) => {
-    if (event.button === 1 || event.pointerType === 'touch') {
-
-      event.preventDefault()
-
-      panzoomRef.value.setOptions({
-        disablePan: false,
-        cursor: 'grabbing'
-      })
-
-    }
-  }, {capture: true})
-
-  window.addEventListener('pointerup', (event) => {
-    if (event.button === 1 || event.pointerType === 'touch') {
-      panzoomRef.value.setOptions({
-        disablePan: true,
-        cursor: 'default'
-      })
-    }
-  }, {capture: true})
-}
-
 onMounted(() => {
   loading.value = true
   productList.value = productsDb.items
@@ -288,6 +256,12 @@ function doHomeAction(actionMethod) {
                     @click="doHomeAction('hide-asset')"
                     title="Exibir Ilustração"
                   ></v-btn>
+                  <v-btn
+                    variant="text"
+                    icon="mdi-auto-fix"
+                    @click="decorativeElementDialog = true"
+                    title="Exibir Elementos Decorativos"
+                  ></v-btn>
                 </div>
 
                 <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">
@@ -306,11 +280,11 @@ function doHomeAction(actionMethod) {
                       icon="mdi-restore"
                       @click="doHomeAction('reset-position')"
                       title="Ocultar Produtos"
-                    ></v-btn>
-                    <v-btn icon="mdi-format-align-left"></v-btn>
-                    <v-btn icon="mdi-format-align-center"></v-btn>
-                    <v-btn icon="mdi-format-align-right"></v-btn>
-                    <v-btn icon="mdi-format-align-justify"></v-btn>
+                    />
+                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-left" @click.stop="dragAndDropRef.doFormatAlign('left', selectedShelf)"/>
+                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-center" @click.stop="dragAndDropRef.doFormatAlign('center', selectedShelf)"/>
+                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-right" @click.stop="dragAndDropRef.doFormatAlign('right', selectedShelf)"/>
+                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-justify" @click.stop="dragAndDropRef.doFormatAlign('justify', selectedShelf)"/>
 
                   </v-btn-group>
                 </div>
@@ -330,7 +304,6 @@ function doHomeAction(actionMethod) {
           Ações
         </span>
               </div>
-
             </div>
           </v-card>
         </v-col>
@@ -440,65 +413,156 @@ function doHomeAction(actionMethod) {
             </v-expansion-panel>
           </v-expansion-panels>
         </v-col>
+
+        <v-col cols="12">
+          <v-slide-y-transition>
+            <v-card
+              v-if="selectedProduct"
+              class="product-detail-card ma-4"
+              elevation="4"
+              rounded="lg"
+              border
+              max-width="350"
+            >
+              <div class="d-flex flex-no-wrap justify-space-between">
+                  <v-img
+                    :src="selectedProduct.previewUrl"
+                    width="50" height="50"
+                    class="ma-auto"
+                  ></v-img>
+
+                <div class="d-flex flex-column justify-center py-2 pr-2 w-100">
+                  <div>
+                    <div class="text-subtitle-1 font-weight-bold text-truncate" style="max-width: 200px">
+                      {{ selectedProduct.title }}
+                    </div>
+                    <div class="text-caption text-medium-emphasis mb-2">
+                      <v-icon icon="mdi-barcode" size="small" start />
+                      {{ selectedProduct.ean }}
+                    </div>
+                  </div>
+
+                  <div class="d-flex gap-1">
+                    <v-chip size="x-small" label color="primary" variant="tonal" class="px-1">
+                      A: {{ selectedProduct.height }}cm
+                    </v-chip>
+                    <v-chip size="x-small" label color="primary" variant="tonal" class="px-1 ml-1">
+                      L: {{ selectedProduct.width }}cm
+                    </v-chip>
+                    <v-chip size="x-small" label color="primary" variant="tonal" class="px-1 ml-1">
+                      P: {{ selectedProduct.depth }}cm
+                    </v-chip>
+                  </div>
+                </div>
+
+                <div class="pa-1">
+                  <v-btn
+                    icon="mdi-close"
+                    variant="text"
+                    density="compact"
+                    size="small"
+                    color="grey"
+                    @click="selectedProduct = null"
+                  ></v-btn>
+                </div>
+              </div>
+            </v-card>
+          </v-slide-y-transition>
+        </v-col>
         <v-col cols="12">
           <v-row>
-          <v-col cols="2" v-if="showProducts">
-            <v-card color="white" :disabled="shelf.length === 0">
-              <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o produto"
-                            single-line
-                            prepend-inner-icon="mdi-magnify" hide-details/>
-              <v-treeview
-                :items="productList ?? []"
-                density="compact"
-                color="primary"
-                bg-color="white"
-                activatable
-                border
-                fluid
-                open-on-click
-                rounded
-              >
-                <template v-slot:prepend="{ item }">
-                  <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
-                  <v-img v-else :src="item.previewUrl" width="50" height="50"></v-img>
-                </template>
+            <v-col cols="2" v-if="showProducts">
+              <v-card color="white" :disabled="shelf.length === 0">
+                <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o produto"
+                              single-line
+                              prepend-inner-icon="mdi-magnify" hide-details/>
+                <v-treeview
+                  :items="productList ?? []"
+                  density="compact"
+                  color="primary"
+                  bg-color="white"
+                  activatable
+                  border
+                  fluid
+                  open-on-click
+                  rounded
+                >
+                  <template v-slot:prepend="{ item }">
+                    <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
+                    <v-img v-else :src="item.previewUrl" width="50" height="50"></v-img>
+                  </template>
 
-                <template v-slot:title="{ item }">
-                  <div
-                    class="draggable-node"
-                    :draggable="!item.children"
-                    @click.stop="addProduct(item)"
-                  >
-                    <p :class="item.label === 'category'? 'text-subtitle-1' : 'text-subtitle-1 custom-line'">
-                      {{ item.title }}
-                    </p>
-                    <p v-if="item.width && item.height" class="text-caption font-italic">
-                      {{ item.width }}cm/{{ item.height }}cm
-                    </p>
-                  </div>
-                </template>
-              </v-treeview>
-              <v-btn block
-                     prepend-icon="mdi-plus"
-                     color="success"
-                     @click.stop="addProductModel = true"
+                  <template v-slot:title="{ item }">
+                    <div
+                      class="draggable-node"
+                      :draggable="!item.children"
+                      @click.stop="addProduct(item)"
+                    >
+                      <p :class="item.label === 'category'? 'text-subtitle-1' : 'text-subtitle-1 custom-line'">
+                        {{ item.title }}
+                      </p>
+                      <p v-if="item.width && item.height" class="text-caption font-italic">
+                        {{ item.width }}cm/{{ item.height }}cm
+                      </p>
+                    </div>
+                  </template>
+                </v-treeview>
+                <v-btn block
+                       prepend-icon="mdi-plus"
+                       color="success"
+                       @click.stop="addProductModel = true"
 
-              >Adicionar produto
-              </v-btn>
+                >Adicionar produto
+                </v-btn>
 
-              <v-btn block
-                     prepend-icon="mdi-import"
-                     color="warning"
-                     @click.stop="importProductModel = true"
-              >Exportar produto
-              </v-btn>
-            </v-card>
-          </v-col>
-          <v-col>
-            <v-sheet ref="canvasRef" class="custom-border pa-2 polka-dot">
-              <drag-and-drop-shelf ref="dragAndDropRef" v-model:shelf="shelf" :show-assets="showAssets"/>
-            </v-sheet>
-          </v-col>
+                <v-btn block
+                       prepend-icon="mdi-import"
+                       color="warning"
+                       @click.stop="importProductModel = true"
+                >Exportar produto
+                </v-btn>
+              </v-card>
+            </v-col>
+            <template v-if="shelf && shelf.length > 0">
+              <v-col>
+                <v-sheet ref="canvasRef" class="custom-border pa-2 polka-dot">
+                  <drag-and-drop-shelf ref="dragAndDropRef"
+                                       v-model:shelf="shelf"
+                                       v-model:selectedShelf="selectedShelf"
+                                       v-model:selectedProduct="selectedProduct"
+                                       :show-assets="showAssets"/>
+                </v-sheet>
+              </v-col>
+            </template>
+            <template v-else>
+              <v-col>
+                <v-card>
+                  <v-empty-state icon="mdi-cart-off">
+                    <template v-slot:media>
+                      <v-img
+                        class="ma-auto"
+                        src="https://mystickermania.com/cdn/stickers/spongebob/sb-upset-fish-meme-512x512.png"
+                        :height="300"
+                        :width="500"
+                      ></v-img>
+
+                    </template>
+
+                    <template v-slot:headline>
+                      <div class="text-h4">
+                        Nenhuma prateleira adicionada
+                      </div>
+                    </template>
+
+                    <template v-slot:title>
+                      <div class="text-h6">
+                        Como você quer planogramar sem prateleiras
+                      </div>
+                    </template>
+                  </v-empty-state>
+                </v-card>
+              </v-col>
+            </template>
           </v-row>
         </v-col>
       </v-row>
@@ -556,5 +620,16 @@ function doHomeAction(actionMethod) {
 .polka-dot > * {
   position: relative;
   z-index: 1;
+}
+
+.product-inspector {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%); /* Centraliza na tela */
+  width: 90%; /* Ou tamanho fixo ex: 600px */
+  max-width: 800px;
+  z-index: 200;
+  border: 1px solid rgba(0,0,0,0.05);
 }
 </style>

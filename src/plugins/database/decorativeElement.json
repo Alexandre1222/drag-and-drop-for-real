@@ -1,8 +1,12 @@
 [
   {
+    "isPhysical": true,
+    "physicalOrder": 1,
     "text": "ROCK MUSIC",
-    "border": "2px",
-    "borderColor": "red",
-    "backgroundColor": "gray"
+    "color": "#FF5733",
+    "dimensions": {
+      "width": 15.5,
+      "height": 8.0
+    }
   }
 ]

@@ -17,7 +17,8 @@ defineProps({
   }
 })
 defineExpose({
-  resetPosition
+  resetPosition,
+  doFormatAlign
 })
 const welcomeDialogRef = ref(false)
 const {play: deleteSound} = useSound(bonk, {
@@ -31,7 +32,8 @@ const {play: addMagicSound} = useSound(magic, {
 const draggedItem = ref(null)
 const menu = ref(false)
 const shelf = defineModel("shelf")
-const selectedShelf = ref({x: 0, y: 0})
+const selectedShelf = defineModel("selectedShelf")
+const selectedProduct = defineModel("selectedProduct")
 
 const dragShow = ref([])
 const dragPreview = reactive([{
@@ -323,14 +325,13 @@ onMounted(() => {
   let elem = document.getElementById('canvas');
   panzoomRef.value = Panzoom(elem, {
     maxScale: 5,
-    excludeClass: 'exclude-area'
+    excludeClass: 'exclude-area',
   })
   elem.parentElement.addEventListener('wheel', panzoomRef.value.zoomWithWheel)
 })
 
 function onMouseDown(event) {
   if (event.button === 1) {
-    event.preventDefault();
     isPanningCanva.value = true;
     panzoomRef.value.setOptions({
       disablePan: true,
@@ -357,42 +358,13 @@ function resetPosition() {
        @mouseleave="onMouseLeave"
        :style="{ cursor: isPanningCanva ? 'grabbing' : 'default' }"
   >
-  <template v-for="(shelfItem, index) in shelf" v-if="shelf && shelf.length > 0">
-    <v-sheet  :width="cmToPixel(null, shelfItem.width).widthPx + 'px'" class="custom-border pa-0 ma-0">
-      <v-btn-toggle density="compact" border divided>
-        <v-btn size="x-small" @click.stop="doFormatAlign('left', index)">
-          <span class="hidden-sm-and-down">Left</span>
-
-          <v-icon end>
-            mdi-format-align-left
-          </v-icon>
-        </v-btn>
-
-        <v-btn size="x-small" @click.stop="doFormatAlign('center', index)">
-          <span class="hidden-sm-and-down">Center</span>
-
-          <v-icon end>
-            mdi-format-align-center
-          </v-icon>
-        </v-btn>
-
-        <v-btn size="x-small" @click.stop="doFormatAlign('right', index)">
-          <span class="hidden-sm-and-down">Right</span>
-
-          <v-icon end>
-            mdi-format-align-right
-          </v-icon>
-        </v-btn>
-
-        <v-btn size="x-small" @click.stop="doFormatAlign('justify', index)">
-          <span class="hidden-sm-and-down">Justify</span>
-
-          <v-icon end>
-            mdi-format-align-justify
-          </v-icon>
-        </v-btn>
-      </v-btn-toggle>
+  <template v-for="(shelfItem, index) in shelf">
+    <v-sheet  :width="cmToPixel(null, shelfItem.width).widthPx + 'px'"
+              class="shelf-container pa-0 ma-0"
+              :class="{ 'selected': selectedShelf === index }"
+    >
       <div class="flex-nowrap droppable-area"
+           @click.stop="selectedShelf = index"
            @contextmenu.prevent.stop="openShelfMenu(index, $event)"
            @drop="onDrop(index, $event, cmToPixel(shelfItem.height, null).heightPx)"
            @dragover.prevent="onDragOver($event, cmToPixel(shelfItem.height, null).heightPx, index)"
@@ -402,8 +374,9 @@ function resetPosition() {
         <v-menu
           v-model="shelfMenu"
           location="end"
-          scroll-strategy="close"
-          :target="[selectedShelf.x, selectedShelf.y]"
+          :target="[selectedShelf?.x ?? 0, selectedShelf?.y ?? 0]"
+          close-on-back
+          close-on-content-click
         >
           <v-list
             class="py-0"
@@ -425,7 +398,7 @@ function resetPosition() {
         </v-menu>
         <div class="position-absolute cursor-move image-item menuContext exclude-area"
              v-for="(imageItem, itemIndex) in shelfItem.products"
-             @click.stop="productClick(imageItem, itemIndex, index, $event)"
+             @click.stop="selectedProduct = imageItem"
              @dragstart.stop="onDragStart(imageItem, itemIndex, index, $event)"
              @dragend.stop="onDragEnd"
              @drop="onDragEnd"
@@ -451,8 +424,9 @@ function resetPosition() {
         <v-menu
           v-model="menu"
           location="end"
-          scroll-strategy="close"
           :target="menuTarget"
+          close-on-back
+          close-on-content-click
         >
           <v-list
             class="py-0"
@@ -477,32 +451,6 @@ function resetPosition() {
                  variant="solid" class="border-opacity-100"/>
     </v-sheet>
   </template>
-
-  <v-card v-else>
-    <v-empty-state icon="mdi-cart-off">
-      <template v-slot:media>
-        <v-img
-          class="ma-auto"
-          src="https://mystickermania.com/cdn/stickers/spongebob/sb-upset-fish-meme-512x512.png"
-          :height="300"
-          :width="500"
-        ></v-img>
-
-      </template>
-
-      <template v-slot:headline>
-        <div class="text-h4">
-          Nenhuma prateleira adicionada
-        </div>
-      </template>
-
-      <template v-slot:title>
-        <div class="text-h6">
-          Como você quer planogramar sem prateleiras
-        </div>
-      </template>
-    </v-empty-state>
-  </v-card>
   </div>
   <welcome-dialog v-model="welcomeDialogRef"/>
 </template>
@@ -516,8 +464,40 @@ function resetPosition() {
   position: relative;
 }
 
-.custom-border {
-  border: 3px solid black;
-  background-color: rgba(0, 0, 0, 0.3);
+.shelf-container {
+  /* Borda mais fina e em cinza suave em vez de preto sólido */
+  border: 2px solid #e0e0e0;
+
+  /* Fundo branco ou muito levemente cinza */
+  background-color: rgba(255, 255, 255, 0.6);
+
+  /* Cantos levemente arredondados */
+  border-radius: 8px;
+
+  /* A mágica da suavidade: anima todas as mudanças (cor, borda, sombra) */
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  cursor: pointer;
+}
+
+/* Estado de Hover (quando passa o mouse) */
+.shelf-container:hover {
+  border-color: #bdbdbd;
+  background-color: #fafafa;
+}
+
+/* Estado Selecionado */
+.shelf-container.selected {
+  /* Borda na cor primária (Ex: Azul Vuetify ou sua marca) */
+  border-color: #1976D2;
+
+  /* Fundo com tintura da cor primária, bem suave */
+  background-color: rgba(25, 118, 210, 0.08);
+
+  /* Sombra colorida suave para dar destaque ("lift") */
+  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.2);
+
+  /* Opcional: aumenta levemente o z-index para ficar sobre os outros */
+  z-index: 2;
 }
 </style>
