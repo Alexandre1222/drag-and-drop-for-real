@@ -1,12 +1,15 @@
-[
-  {
-    "isPhysical": true,
-    "physicalOrder": 1,
-    "text": "ROCK MUSIC",
-    "color": "#FF5733",
-    "dimensions": {
-      "width": 15.5,
-      "height": 8.0
+{
+  "items": [
+    {
+      "isPhysical": true,
+      "physicalOrder": 1,
+      "text": "ROCK MUSIC",
+      "color": "#FF5733",
+      "label": "decorative",
+      "dimensions": {
+        "width": 15.5,
+        "height": 8.0
+      }
     }
-  }
-]
+  ]
+}
