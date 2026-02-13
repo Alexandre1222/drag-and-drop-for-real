@@ -1,7 +1,6 @@
 <script setup>
 import {onMounted, onUnmounted, ref} from "vue";
 import {useSound} from '@vueuse/sound';
-import Panzoom from "@panzoom/panzoom";
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
 import EditProductDialog from "@/components/dialog/editProductDialog.vue";
 import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
@@ -89,14 +88,14 @@ function canAddShelf(newShelfHeight) {
   return true;
 }
 
-
 function addProduct(productItem) {
   if (productItem.label === 'category') return;
 
   const shelfRef = shelf.value[selectedShelf?.value ?? 0];
+  const physicalProducts = shelfRef.products.filter(p => p.isPhysical !== false);
   const {width, height} = productItem;
 
-  if (canAddProduct(shelfRef.products, shelfRef.width, width)) {
+  if (canAddProduct(physicalProducts, shelfRef.width, width)) {
     showSnackbar('Limite atingido, não é possível adicionar mais produtos');
     return;
   }
@@ -106,7 +105,7 @@ function addProduct(productItem) {
   const shelfHeightPx = cmToPixel(shelfRef.height, null).heightPx;
   const productHeightPx = cmToPixel(height, null).heightPx;
 
-  const sortedProducts = [...shelfRef.products].sort((a, b) => a.x - b.x);
+  const sortedProducts = [...physicalProducts].sort((a, b) => a.x - b.x);
   let foundX = null;
 
   if (sortedProducts.length === 0) {
@@ -145,7 +144,6 @@ function addProduct(productItem) {
 
 function addDecorativeElement(item) {
   const shelfRef = shelf.value[selectedShelf?.value ?? 0];
-
   const width = item.width ?? item.dimensions?.width ?? 0;
   const height = item.height ?? item.dimensions?.height ?? 0;
 
@@ -160,22 +158,18 @@ function addDecorativeElement(item) {
   const elementHeightPx = cmToPixel(height, null).heightPx;
 
   let posX = 0;
+  const isPhysical = item.isPhysical === true;
 
-  // 🔹 Se for físico, respeita regra de espaço
-  if (item.isPhysical) {
-    const widthAccumulated = shelfRef.products.reduce((acc, p) => acc + p.width, 0);
+  if (isPhysical) {
+    posX = shelfRef.products.reduce((acc, p) => {
+      return acc + (p.isPhysical !== false ? cmToPixel(null, p.width).widthPx : 0);
+    }, 0);
 
-    if (widthAccumulated + width > shelfRef.width) {
-      showSnackbar('Sem espaço para elemento físico.');
+    if (canAddProduct(shelfRef.products, shelfRef.width, width)) {
+      showSnackbar('Sem espaço físico na prateleira.');
       return;
     }
-
-    posX = shelfRef.products.reduce((acc, p) => {
-      return acc + cmToPixel(null, p.width).widthPx;
-    }, 0);
-  }
-  // 🔹 Se for decorativo (flutuante), posiciona no centro por padrão
-  else {
+  } else {
     posX = (shelfWidthPx - elementWidthPx) / 2;
   }
 
@@ -186,6 +180,8 @@ function addDecorativeElement(item) {
     width,
     height,
     x: posX,
+    y: shelfHeightPx - elementHeightPx,
+    isPhysical: isPhysical,
     type: 'decorative'
   };
 
@@ -219,18 +215,6 @@ function handleKeydown(e) {
   }
 }
 
-onMounted(() => {
-  loading.value = true;
-  productList.value = productsDb.items;
-  decorativeElementList.value = decorativeElementDb.items;
-  window.addEventListener('keydown', handleKeydown);
-  setTimeout(() => loading.value = false, 2000);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeydown);
-});
-
 function doHomeAction(actionMethod) {
   const actions = {
     'hide-expansion': () => showExpansion.value = !showExpansion.value,
@@ -250,55 +234,57 @@ function isColorDark(colorHex) {
   const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
   return yiq < 128;
 }
+
+onMounted(() => {
+  loading.value = true;
+  productList.value = productsDb.items;
+  decorativeElementList.value = decorativeElementDb.items;
+  window.addEventListener('keydown', handleKeydown);
+  setTimeout(() => loading.value = false, 2000);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown);
+});
 </script>
 
 <template>
   <v-container fluid>
     <template v-if="!loading">
       <v-row>
-        <v-col cols="12" class="pa-0">
+        <v-col class="pa-0" cols="12">
           <v-card border>
             <div class="d-flex px-2 py-2 w-100 overflow-x-auto">
               <div class="d-flex flex-column justify-space-between align-center px-4">
                 <div class="d-flex mb-1 gap-1">
-                  <v-btn variant="text" :color="showExpansion ? 'success' : 'error'" icon="mdi-form-select"
-                         @click="doHomeAction('hide-expansion')" title="Ocultar Expansão"></v-btn>
-                  <v-btn variant="text" :color="showProducts ? 'success' : 'error'" icon="mdi-shopping"
-                         @click="doHomeAction('hide-products')" title="Ocultar Produtos"></v-btn>
-                  <v-btn variant="text" :color="showAssets ? 'success' : 'error'"
-                         :icon="showAssets ? 'mdi-eye-off' : 'mdi-eye'" @click="doHomeAction('hide-asset')"
-                         title="Exibir Ilustração"></v-btn>
-                  <v-btn variant="text" icon="mdi-auto-fix" @click="decorativeElementDialog = true"
-                         title="Exibir Elementos Decorativos"></v-btn>
+                  <v-btn :color="showExpansion ? 'success' : 'error'" icon="mdi-form-select" title="Ocultar Expansão" variant="text" @click="doHomeAction('hide-expansion')"></v-btn>
+                  <v-btn :color="showProducts ? 'success' : 'error'" icon="mdi-shopping" title="Ocultar Produtos" variant="text" @click="doHomeAction('hide-products')"></v-btn>
+                  <v-btn :color="showAssets ? 'success' : 'error'" :icon="showAssets ? 'mdi-eye-off' : 'mdi-eye'" title="Exibir Ilustração" variant="text" @click="doHomeAction('hide-asset')"></v-btn>
+                  <v-btn icon="mdi-auto-fix" title="Exibir Elementos Decorativos" variant="text" @click="decorativeElementDialog = true"></v-btn>
                 </div>
                 <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">Exibição</span>
               </div>
 
-              <v-divider vertical class="my-1 mx-2"></v-divider>
+              <v-divider class="my-1 mx-2" vertical></v-divider>
 
               <div class="d-flex flex-column justify-space-between align-center px-4">
                 <div class="d-flex mb-1">
-                  <v-btn-group density="compact" variant="outlined" divided>
-                    <v-btn variant="text" icon="mdi-restore" @click="doHomeAction('reset-position')"
-                           title="Resetar Posição"/>
-                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-left"
-                           @click.stop="dragAndDropRef?.doFormatAlign('left', selectedShelf)"/>
-                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-center"
-                           @click.stop="dragAndDropRef?.doFormatAlign('center', selectedShelf)"/>
-                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-right"
-                           @click.stop="dragAndDropRef?.doFormatAlign('right', selectedShelf)"/>
-                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-justify"
-                           @click.stop="dragAndDropRef?.doFormatAlign('justify', selectedShelf)"/>
+                  <v-btn-group density="compact" divided variant="outlined">
+                    <v-btn icon="mdi-restore" title="Resetar Posição" variant="text" @click="doHomeAction('reset-position')"/>
+                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-left" @click.stop="dragAndDropRef?.doFormatAlign('left', selectedShelf)"/>
+                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-center" @click.stop="dragAndDropRef?.doFormatAlign('center', selectedShelf)"/>
+                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-right" @click.stop="dragAndDropRef?.doFormatAlign('right', selectedShelf)"/>
+                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-justify" @click.stop="dragAndDropRef?.doFormatAlign('justify', selectedShelf)"/>
                   </v-btn-group>
                 </div>
                 <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">Canvas</span>
               </div>
 
-              <v-divider vertical class="my-1 mx-2"></v-divider>
+              <v-divider class="my-1 mx-2" vertical></v-divider>
 
               <div class="d-flex flex-column justify-space-between align-center px-4">
                 <div class="d-flex mb-1">
-                  <v-btn variant="text" icon="mdi-content-save-outline"></v-btn>
+                  <v-btn icon="mdi-content-save-outline" variant="text"></v-btn>
                 </div>
                 <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">Ações</span>
               </div>
@@ -306,7 +292,7 @@ function isColorDark(colorHex) {
           </v-card>
         </v-col>
 
-        <v-col cols="12" v-if="showExpansion">
+        <v-col v-if="showExpansion" cols="12">
           <v-expansion-panels>
             <v-expansion-panel>
               <v-expansion-panel-title v-slot="{ expanded }">
@@ -315,7 +301,7 @@ function isColorDark(colorHex) {
                   <v-col class="text--secondary" cols="8">
                     <v-fade-transition leave-absolute>
                       <span v-if="expanded">Customize e adicione prateleiras</span>
-                      <v-row v-else style="width: 100%" no-gutters>
+                      <v-row v-else no-gutters style="width: 100%">
                         <v-col class="d-flex justify-start" cols="6">Possui {{ shelf.length }} colunas</v-col>
                       </v-row>
                     </v-fade-transition>
@@ -324,7 +310,7 @@ function isColorDark(colorHex) {
               </v-expansion-panel-title>
               <v-expansion-panel-text>
                 <v-sheet border rounded>
-                  <v-data-table density="compact" :headers="headers" :items="shelf">
+                  <v-data-table :headers="headers" :items="shelf" density="compact">
                     <template v-slot:top>
                       <v-toolbar flat>
                         <v-toolbar-title>
@@ -336,16 +322,13 @@ function isColorDark(colorHex) {
                     </template>
                     <template v-slot:item.level="{ index }">{{ index + 1 }}</template>
                     <template v-slot:item.height="{ index }">
-                      <v-text-field controlVariant="split" density="compact" type="number" v-model="shelf[index].height"
-                                    @update:model-value="updateProductsPosition(index)" hide-details/>
+                      <v-text-field v-model="shelf[index].height" controlVariant="split" density="compact" hide-details type="number" @update:model-value="updateProductsPosition(index)"/>
                     </template>
                     <template v-slot:item.width="{ index }">
-                      <v-text-field controlVariant="split" density="compact" type="number" v-model="shelf[index].width"
-                                    hide-details/>
+                      <v-text-field v-model="shelf[index].width" controlVariant="split" density="compact" hide-details type="number"/>
                     </template>
                     <template v-slot:item.tickness="{ index }">
-                      <v-text-field controlVariant="split" density="compact" type="number"
-                                    v-model="shelf[index].tickness" hide-details/>
+                      <v-text-field v-model="shelf[index].tickness" controlVariant="split" density="compact" hide-details type="number"/>
                     </template>
                     <template v-slot:item.color="{ value, index }">
                       <v-dialog max-width="500">
@@ -355,15 +338,14 @@ function isColorDark(colorHex) {
                         <template v-slot:default>
                           <v-card title="Dialog">
                             <v-card-text>
-                              <v-color-picker hide-inputs v-model="shelf[index].color"></v-color-picker>
+                              <v-color-picker v-model="shelf[index].color" hide-inputs></v-color-picker>
                             </v-card-text>
                           </v-card>
                         </template>
                       </v-dialog>
                     </template>
                     <template v-slot:item.action="{ index }">
-                      <v-icon color="medium-emphasis" icon="mdi-delete" size="small"
-                              @click="shelf.splice(index, 1)"></v-icon>
+                      <v-icon color="medium-emphasis" icon="mdi-delete" size="small" @click="shelf.splice(index, 1)"></v-icon>
                     </template>
                   </v-data-table>
                 </v-sheet>
@@ -371,9 +353,9 @@ function isColorDark(colorHex) {
             </v-expansion-panel>
           </v-expansion-panels>
         </v-col>
+
         <v-slide-y-transition>
-          <v-card v-if="selectedProduct" class="product-detail-card ma-4" elevation="4" rounded="lg" border
-                  max-width="350">
+          <v-card v-if="selectedProduct" border class="product-detail-card ma-4" elevation="4" max-width="350" rounded="lg">
             <div class="d-flex flex-no-wrap justify-space-between align-center">
               <v-img :src="selectedProduct.imageItem.previewUrl" height="50" width="50"></v-img>
               <div class="d-flex flex-column justify-center py-2 pr-2 w-100">
@@ -382,26 +364,25 @@ function isColorDark(colorHex) {
                     {{ selectedProduct.imageItem.title }}
                   </div>
                   <div class="text-caption text-medium-emphasis mb-2">
-                    <v-icon icon="mdi-barcode" size="small" start/>
-                    {{ selectedProduct.imageItem.ean }}
+                    <template v-if="selectedProduct.imageItem.label === 'product'">
+                      <v-icon icon="mdi-barcode" size="small" start/>{{ selectedProduct.imageItem.ean }}
+                    </template>
+                    <template v-else>
+                      <div class="d-flex flex-column">
+                        <div class="d-flex align-center"><v-icon icon="mdi-palette" size="small" class="mr-1" />{{ selectedProduct.imageItem.color }}</div>
+                        <div class="d-flex align-center"><v-icon icon="mdi-brush" size="small" class="mr-1" />{{ selectedProduct.imageItem.dimensions.fontSize }}</div>
+                      </div>
+                    </template>
                   </div>
                 </div>
                 <div class="d-flex gap-1">
-                  <v-chip size="x-small" label color="primary" variant="tonal" class="px-1">A: {{
-                      selectedProduct.imageItem.height
-                    }}cm
-                  </v-chip>
-                  <v-chip size="x-small" label color="primary" variant="tonal" class="px-1 ml-1">L:
-                    {{ selectedProduct.imageItem.width }}cm
-                  </v-chip>
-                  <v-chip size="x-small" label color="primary" variant="tonal" class="px-1 ml-1">P:
-                    {{ selectedProduct.imageItem.depth }}cm
-                  </v-chip>
+                  <v-chip class="px-1" color="primary" label size="x-small" variant="tonal">A: {{ selectedProduct.imageItem.height }}cm</v-chip>
+                  <v-chip class="px-1 ml-1" color="primary" label size="x-small" variant="tonal">L: {{ selectedProduct.imageItem.width }}cm</v-chip>
+                  <v-chip class="px-1 ml-1" color="primary" label size="x-small" variant="tonal">P: {{ selectedProduct.imageItem.depth ?? 0 }}cm</v-chip>
                 </div>
               </div>
               <div class="pa-1 align-self-start">
-                <v-btn icon="mdi-close" variant="text" density="compact" size="small" color="grey"
-                       @click="selectedProduct = null"></v-btn>
+                <v-btn color="grey" density="compact" icon="mdi-close" size="small" variant="text" @click="selectedProduct = null"></v-btn>
               </div>
             </div>
           </v-card>
@@ -409,116 +390,64 @@ function isColorDark(colorHex) {
 
         <v-col cols="12">
           <v-row>
-            <v-col cols="2" v-if="showProducts">
-              <v-card color="white" :disabled="shelf.length === 0">
-                <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o produto"
-                              single-line prepend-inner-icon="mdi-magnify" hide-details/>
-                <v-treeview :items="productList ?? []" density="compact" color="primary" bg-color="white" activatable
-                            border fluid open-on-click rounded>
+            <v-col v-if="showProducts" cols="2">
+              <v-card :disabled="shelf.length === 0" color="white">
+                <v-text-field bg-color="white" density="compact" hide-details label="Selecione o produto" prepend-inner-icon="mdi-magnify" single-line variant="outlined"/>
+                <v-treeview :items="productList ?? []" activatable bg-color="white" border color="primary" density="compact" fluid open-on-click rounded>
                   <template v-slot:prepend="{ item }">
                     <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
-                    <v-img v-else :src="item.previewUrl" width="50" height="50"></v-img>
+                    <v-img v-else :src="item.previewUrl" height="50" width="50"></v-img>
                   </template>
                   <template v-slot:title="{ item }">
-                    <div class="draggable-node" :draggable="!item.children" @click.stop="addProduct(item)">
-                      <p :class="item.label === 'category'? 'text-subtitle-1' : 'text-subtitle-1 custom-line'">
-                        {{ item.title }}</p>
-                      <p v-if="item.width && item.height" class="text-caption font-italic">{{
-                          item.width
-                        }}cm/{{ item.height }}cm</p>
+                    <div :draggable="!item.children" class="draggable-node" @click.stop="addProduct(item)">
+                      <p :class="item.label === 'category'? 'text-subtitle-1' : 'text-subtitle-1 custom-line'">{{ item.title }}</p>
+                      <p v-if="item.width && item.height" class="text-caption font-italic">{{ item.width }}cm/{{ item.height }}cm</p>
                     </div>
                   </template>
                 </v-treeview>
-                <v-btn block prepend-icon="mdi-plus" color="success" @click.stop="addProductModel = true">Adicionar
-                  produto
-                </v-btn>
-                <v-btn block prepend-icon="mdi-import" color="warning" @click.stop="importProductModel = true">Exportar
-                  produto
-                </v-btn>
+                <v-btn block color="success" prepend-icon="mdi-plus" @click.stop="addProductModel = true">Adicionar produto</v-btn>
+                <v-btn block color="warning" prepend-icon="mdi-import" @click.stop="importProductModel = true">Exportar produto</v-btn>
               </v-card>
 
-              <v-card color="white" :disabled="shelf.length === 0">
-                <v-text-field variant="outlined" bg-color="white" density="compact" label="Selecione o elemento decorativo"
-                              single-line prepend-inner-icon="mdi-magnify" hide-details/>
-                <v-treeview
-                  :items="decorativeElementList ?? []"
-                  density="compact"
-                  color="primary"
-                  bg-color="white"
-                  activatable
-                  border
-                  rounded
-                  open-on-click
-                  item-value="text"
-                >
+              <v-card :disabled="shelf.length === 0" color="white">
+                <v-text-field bg-color="white" density="compact" hide-details label="Selecione o elemento decorativo" prepend-inner-icon="mdi-magnify" single-line variant="outlined"/>
+                <v-treeview :items="decorativeElementList ?? []" activatable bg-color="white" border color="primary" density="compact" item-value="text" open-on-click rounded>
                   <template v-slot:prepend="{ item }">
-                    <v-avatar
-                      size="32"
-                      rounded="lg"
-                      class="mr-2 border"
-                      :style="{ backgroundColor: item.color || '#e0e0e0' }"
-                    >
-                      <v-icon
-                        :icon="item.isPhysical ? 'mdi-cube-outline' : 'mdi-sticker-outline'"
-                        size="x-small"
-                        :color="isColorDark(item.color) ? 'white' : 'grey-darken-3'"
-                      />
+                    <v-avatar :style="{ backgroundColor: item.color || '#e0e0e0' }" class="mr-2 border" rounded="lg" size="32">
+                      <v-icon :color="isColorDark(item.color) ? 'white' : 'grey-darken-3'" :icon="item.isPhysical ? 'mdi-cube-outline' : 'mdi-sticker-outline'" size="x-small"/>
                     </v-avatar>
                   </template>
-
                   <template v-slot:title="{ item }">
-                    <div
-                      class="draggable-node py-1"
-                      @click.stop="addDecorativeElement(item)"
-                    >
+                    <div class="draggable-node py-1" @click.stop="addDecorativeElement(item)">
                       <div class="d-flex align-center justify-space-between">
-          <span class="text-subtitle-2 font-weight-bold text-truncate">
-            {{ item.text }}
-          </span>
-
-                        <v-chip
-                          v-if="item.isPhysical"
-                          size="x-small"
-                          color="blue-grey"
-                          variant="tonal"
-                          class="ml-2 font-weight-medium"
-                        >
-                          Físico #{{ item.physicalOrder }}
-                        </v-chip>
+                        <span class="text-subtitle-2 font-weight-bold text-truncate">{{ item.title }}</span>
                       </div>
-
                       <div class="d-flex align-center text-caption text-medium-emphasis mt-1">
-                        <v-icon icon="mdi-ruler-square" size="12" start class="mr-1 opacity-60" />
-                        <span>
-            {{ item.dimensions?.width }}cm <span class="text-disabled">x</span> {{ item.dimensions?.height }}cm
-          </span>
+                        <v-icon class="mr-1 opacity-60" icon="mdi-ruler-square" size="12" start/>
+                        <span>{{ item.dimensions?.width }}cm <span class="text-disabled">x</span> {{ item.dimensions?.height }}cm</span>
                       </div>
                     </div>
                   </template>
-
                   <template v-slot:append>
-                    <v-icon icon="mdi-drag-vertical" color="grey-lighten-1" size="small"></v-icon>
+                    <v-icon color="grey-lighten-1" icon="mdi-drag-vertical" size="small"></v-icon>
                   </template>
                 </v-treeview>
               </v-card>
             </v-col>
+
             <template v-if="shelf && shelf.length > 0">
               <v-col>
-                <v-sheet ref="canvasRef" class="custom-border pa-2 polka-dot" min-height="800" max-height="800">
-                  <drag-and-drop-shelf ref="dragAndDropRef" v-model:shelf="shelf" v-model:selectedShelf="selectedShelf"
-                                       v-model:selectedProduct="selectedProduct" :show-assets="showAssets"/>
+                <v-sheet ref="canvasRef" class="custom-border pa-2 polka-dot" max-height="800" min-height="800">
+                  <drag-and-drop-shelf ref="dragAndDropRef" v-model:selectedProduct="selectedProduct" v-model:selectedShelf="selectedShelf" v-model:shelf="shelf" :show-assets="showAssets"/>
                 </v-sheet>
               </v-col>
             </template>
             <template v-else>
               <v-col>
                 <v-card>
-                  <v-empty-state icon="mdi-cart-off" headline="Nenhuma prateleira adicionada"
-                                 title="Como você quer planogramar sem prateleiras">
+                  <v-empty-state headline="Nenhuma prateleira adicionada" icon="mdi-cart-off" title="Como você quer planogramar sem prateleiras">
                     <template v-slot:media>
-                      <v-img class="ma-auto"
-                             src="https://mystickermania.com/cdn/stickers/spongebob/sb-upset-fish-meme-512x512.png"
-                             :height="300" :width="500"></v-img>
+                      <v-img :height="300" :width="500" class="ma-auto" src="https://mystickermania.com/cdn/stickers/spongebob/sb-upset-fish-meme-512x512.png"></v-img>
                     </template>
                   </v-empty-state>
                 </v-card>
@@ -529,7 +458,7 @@ function isColorDark(colorHex) {
       </v-row>
     </template>
     <template v-else>
-      <v-container height="90vh" class="d-flex justify-center align-center">
+      <v-container class="d-flex justify-center align-center" height="90vh">
         <loading-state/>
       </v-container>
     </template>
@@ -537,20 +466,14 @@ function isColorDark(colorHex) {
 
   <add-product-dialog v-model="addProductModel" @save-product="saveProduct"/>
   <edit-product-dialog v-model="editProductModel"/>
-  <edit-shelf-dialog v-model="editShelfModel" :current-shelf="currentShelf" :currentShelfIndex="shelfIndexToDelete"
-                     @edit-shelf="editShelf"/>
+  <edit-shelf-dialog v-model="editShelfModel" :current-shelf="currentShelf" :currentShelfIndex="shelfIndexToDelete" @edit-shelf="editShelf"/>
   <import-product-dialog v-model="importProductModel" @update-products="saveProduct"/>
   <result-dialog v-model="resultModel" :products="productList" :shelf="shelf"/>
 </template>
 
 <style scoped>
-.custom-line {
-  line-height: 1.0;
-}
-
-.custom-border {
-  border: 2px solid white;
-}
+.custom-line { line-height: 1.0; }
+.custom-border { border: 2px solid white; }
 
 .polka-dot {
   position: relative;
@@ -573,10 +496,7 @@ function isColorDark(colorHex) {
   z-index: 0;
 }
 
-.polka-dot > * {
-  position: relative;
-  z-index: 1;
-}
+.polka-dot > * { position: relative; z-index: 1; }
 
 .product-detail-card {
   position: fixed;

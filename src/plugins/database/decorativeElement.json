@@ -1,14 +1,28 @@
 {
   "items": [
     {
-      "isPhysical": true,
+      "isPhysical": false,
       "physicalOrder": 1,
-      "text": "ROCK MUSIC",
+      "title": "Condimentos",
       "color": "#FF5733",
       "label": "decorative",
       "dimensions": {
-        "width": 15.5,
-        "height": 8.0
+        "width": 30.5,
+        "height": 9.0,
+        "fontSize": "15pt"
+      }
+    },
+
+    {
+      "isPhysical": false,
+      "physicalOrder": 1,
+      "title": "Energético",
+      "color": "#FF5733",
+      "label": "decorative",
+      "dimensions": {
+        "width": 30.5,
+        "height": 9.0,
+        "fontSize": "15pt"
       }
     }
   ]
