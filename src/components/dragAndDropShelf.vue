@@ -57,7 +57,7 @@ const getProductStyle = (imageItem) => {
     height: `${heightPx}px`,
     width: `${widthPx}px`,
     backgroundColor: hasImage ? 'rgba(0,0,0,0)' : (imageItem.color || stringToColour(imageItem.ean)),
-    zIndex: imageItem.isPhysical ? 200 : 0,
+    zIndex: imageItem.isPhysical ? 0 : 200,
   };
 };
 
@@ -72,12 +72,10 @@ const getProductClasses = (imageItem, itemIndex, shelfIndex) => {
 };
 
 function hasHorizontalCollision(products, indexToIgnore, newX, draggedWidth, isItemPhysical) {
-  console.log(isItemPhysical)
   if (!isItemPhysical || !products) return false;
 
   const draggedStart = newX;
   const draggedEnd = newX + draggedWidth;
-  const tolerance = 0.1;
 
   return products.some((item, index) => {
     if (!item || index === indexToIgnore || item.isPhysical === false) {
@@ -87,8 +85,7 @@ function hasHorizontalCollision(products, indexToIgnore, newX, draggedWidth, isI
     const itemWidthPx = cmToPixel(null, item.width).widthPx;
     const itemStart = item.x;
     const itemEnd = item.x + itemWidthPx;
-
-    return (draggedStart < itemEnd - tolerance) && (draggedEnd > itemStart + tolerance);
+    return (draggedStart < itemEnd) && (draggedEnd > itemStart);
   });
 }
 
@@ -223,7 +220,8 @@ function onDrop(index, event, shelfHeight = 0) {
   const finalX = mouseRelX - draggedItem.value.offsetX;
 
   const itemToIgnore = (sourceIndex === index) ? draggedProduct : null;
-  if (isPhysical && hasHorizontalCollision(destShelf.products, itemToIgnore, finalX, draggedProduct.widthPx, true)) {
+  const draggedWidthPx = cmToPixel(null, draggedItem.value.item.width).widthPx
+  if (isPhysical && hasHorizontalCollision(destShelf.products, itemToIgnore, finalX, draggedWidthPx, true)) {
     showSnackbar('Não é possível soltar o produto sobre outro');
     return;
   }
@@ -276,8 +274,8 @@ const onDragOver = (event, shelfHeight, shelfIndex) => {
   } else {
     dragPreview.y = mouseRelY - draggedItem.value.offsetY;
   }
-  console.log(dragPreview.isPhysical)
-  const collision = hasHorizontalCollision(destShelf.products, draggedItem.value.index, dragPreview.x, null, dragPreview.isPhysical);
+  const draggedWidthPx = cmToPixel(null, draggedItem.value.item.width).widthPx
+  const collision = hasHorizontalCollision(destShelf.products, draggedItem.value.index, dragPreview.x, draggedWidthPx, dragPreview.isPhysical);
 
   previewStyle.value.backgroundColor = collision ? "#ff2c2c" : stringToColour(dragPreview.ean);
 };

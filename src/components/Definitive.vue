@@ -1,6 +1,6 @@
 <script setup>
-import {onMounted, onUnmounted, ref} from "vue";
-import {useSound} from '@vueuse/sound';
+import { onMounted, onUnmounted, ref, nextTick } from "vue";
+import { useSound } from '@vueuse/sound';
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
 import EditProductDialog from "@/components/dialog/editProductDialog.vue";
 import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
@@ -11,16 +11,16 @@ import LoadingState from "@/components/loadingState.vue";
 import productsDb from '@/plugins/database/products.json';
 import decorativeElementDb from '@/plugins/database/decorativeElement.json';
 import cmToPixel from "@/plugins/helper/cmToPixel.js";
-import {showSnackbar} from "@/plugins/helper/customSnackbar.js";
+import { showSnackbar } from "@/plugins/helper/customSnackbar.js";
 import minecraftClick from '@/assets/sounds/minecraftClick.mp3';
 
-const {play: addProductSound} = useSound(minecraftClick, {volume: 1, interrupt: true});
+const { play: addProductSound } = useSound(minecraftClick, { volume: 1, interrupt: true });
 
+const leftTab = ref('products');
 const showExpansion = ref(false);
 const showProducts = ref(false);
 const showAssets = ref(false);
 const loading = ref(false);
-const decorativeElementDialog = ref(false);
 
 const addProductModel = ref(false);
 const editProductModel = ref(false);
@@ -29,44 +29,79 @@ const importProductModel = ref(false);
 const resultModel = ref(false);
 
 const dragAndDropRef = ref(null);
-const canvasRef = ref(null);
-
 const currentShelf = ref(null);
-const selectedShelf = ref(null);
-const selectedProduct = ref(null);
 const shelfIndexToDelete = ref(null);
-
 const productList = ref(null);
 const decorativeElementList = ref(null);
+
 const shelf = ref([
-  {mobiliaryElement: 'Prateleira', height: 40, depth: 0, width: 150, tickness: 2, color: '#A3C4BC', products: []},
-  {mobiliaryElement: 'Prateleira', height: 40, depth: 0, width: 150, tickness: 2, color: '#E9C46A', products: []}
+  { mobiliaryElement: 'Prateleira', height: 40, depth: 0, width: 150, tickness: 2, color: '#A3C4BC', products: [] },
+  { mobiliaryElement: 'Prateleira', height: 40, depth: 0, width: 150, tickness: 2, color: '#E9C46A', products: [] }
 ]);
+const selectedShelf = ref(null);
+const selectedProduct = ref(null);
 
-const standSize = ref({height: 160, width: 92});
+const standSize = ref({ height: 160, width: 92 });
 
-const headers = [
-  {title: 'Nivel', key: 'level', align: 'start'},
-  {title: 'Elemento do mobiliário', key: 'mobiliaryElement'},
-  {title: 'Altura', key: 'height', align: 'center', width: 150},
-  {title: 'Largura', key: 'width', align: 'center', width: 150},
-  {title: 'Espessura', key: 'tickness', align: 'center', width: 150},
-  {title: 'Profundidade', key: 'depth', align: 'end'},
-  {title: 'Cor', key: 'color', align: 'end', width: 50},
-  {title: 'Action', key: 'action', align: 'end', width: 50},
-];
+function getShelfMinWidth(index) {
+  if (!shelf.value[index]) return 1;
+  const physicalProducts = shelf.value[index].products.filter(p => p.isPhysical !== false);
+  return physicalProducts.reduce((sum, p) => sum + p.width, 0) || 1;
+}
 
-function editShelf(newHeight, index) {
-  if (canAddShelf(newHeight)) {
-    shelf.value[index].height = newHeight;
+function getShelfMinHeight(index) {
+  if (!shelf.value[index]) return 1;
+  const physicalProducts = shelf.value[index].products.filter(p => p.isPhysical !== false);
+  return physicalProducts.length > 0 ? Math.max(...physicalProducts.map(p => p.height)) : 1;
+}
+
+function validateShelfDimension(index, field, val) {
+  const newValue = Number(val);
+  if (isNaN(newValue) || newValue <= 0) return;
+
+  const currentShelfData = shelf.value[index];
+
+  if (field === 'width') {
+    const minWidth = getShelfMinWidth(index);
+    if (newValue < minWidth) {
+      showSnackbar(`A largura mínima é ${minWidth}cm devido aos produtos.`);
+      currentShelfData.width = -1;
+      nextTick(() => currentShelfData.width = minWidth);
+    } else {
+      currentShelfData.width = newValue;
+    }
+  } else if (field === 'height') {
+    const minHeight = getShelfMinHeight(index);
+
+    if (newValue < minHeight) {
+      showSnackbar(`A altura mínima é ${minHeight}cm devido aos produtos.`);
+      currentShelfData.height = -1;
+      nextTick(() => {
+        currentShelfData.height = minHeight;
+        updateProductsPosition(index);
+      });
+    }else {
+      currentShelfData.height = newValue;
+      updateProductsPosition(index);
+    }
   }
 }
 
-function saveProduct(product) {
-  product.forEach(p => {
-    p.x = 0;
-    p.y = 0;
-    productList.value.push(p);
+function editShelf(newHeight, index) {
+  validateShelfDimension(index, 'height', newHeight);
+}
+
+function addShelf() {
+  shelf.value.push({
+    mobiliaryElement: 'Prateleira', height: 40, depth: 0, width: 40, tickness: 2, color: '#E9C46A', products: []
+  });
+}
+
+function updateProductsPosition(index) {
+  const currentShelfData = shelf.value[index];
+  const shelfHeight = cmToPixel(currentShelfData.height, null).heightPx;
+  currentShelfData.products.forEach(product => {
+    product.y = shelfHeight - cmToPixel(product.height, null).heightPx;
   });
 }
 
@@ -75,29 +110,19 @@ function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
   return (productWidth + widthAccumulated) > currentShelfWidth;
 }
 
-function canAddShelf(newShelfHeight) {
-  const totalHeight = shelf.value.reduce((sum, {height}) => sum + height, 0);
-  const availableSpace = standSize.value.height - totalHeight;
-
-  if (newShelfHeight > availableSpace) {
-    showSnackbar(availableSpace === 0
-      ? 'Não cabe! Esquece fi, já gastou todo o espaço'
-      : `Não cabe! Espaço disponível: ${availableSpace} cm`);
-    return false;
-  }
-  return true;
-}
-
 function addProduct(productItem) {
   if (productItem.label === 'category') return;
 
-  const shelfRef = shelf.value[selectedShelf?.value ?? 0];
+  const shelfRef = shelf.value[selectedShelf.value ?? 0];
   const physicalProducts = shelfRef.products.filter(p => p.isPhysical !== false);
-  const {width, height} = productItem;
+  const { width, height } = productItem;
+
+  if (height > shelfRef.height) {
+    return showSnackbar(`O produto tem ${height}cm, mas a prateleira tem apenas ${shelfRef.height}cm de altura.`);
+  }
 
   if (canAddProduct(physicalProducts, shelfRef.width, width)) {
-    showSnackbar('Limite atingido, não é possível adicionar mais produtos');
-    return;
+    return showSnackbar('Limite de espaço atingido na prateleira.');
   }
 
   const shelfWidthPx = cmToPixel(null, shelfRef.width).widthPx;
@@ -108,48 +133,43 @@ function addProduct(productItem) {
   const sortedProducts = [...physicalProducts].sort((a, b) => a.x - b.x);
   let foundX = null;
 
-  if (sortedProducts.length === 0) {
-    if (productWidthPx <= shelfWidthPx) foundX = 0;
+  if (sortedProducts.length === 0 || sortedProducts[0].x >= productWidthPx) {
+    foundX = 0;
   } else {
-    if (sortedProducts[0].x >= productWidthPx) {
-      foundX = 0;
-    } else {
-      for (let i = 0; i < sortedProducts.length; i++) {
-        const current = sortedProducts[i];
-        const currentWidthPx = cmToPixel(null, current.width).widthPx;
-        const candidateX = current.x + currentWidthPx;
-        const nextX = (i + 1 < sortedProducts.length) ? sortedProducts[i + 1].x : shelfWidthPx;
+    for (let i = 0; i < sortedProducts.length; i++) {
+      const current = sortedProducts[i];
+      const candidateX = current.x + cmToPixel(null, current.width).widthPx;
+      const nextX = sortedProducts[i + 1]?.x ?? shelfWidthPx;
 
-        if (nextX - candidateX >= productWidthPx) {
-          foundX = candidateX;
-          break;
-        }
+      if (nextX - candidateX >= productWidthPx) {
+        foundX = candidateX;
+        break;
       }
     }
   }
 
   if (foundX === null) {
-    showSnackbar('Não há espaço contínuo suficiente para encaixar este produto.');
-    return;
+    return showSnackbar('Não há espaço contínuo suficiente para encaixar este produto.');
   }
 
   addProductSound();
-  const product = JSON.parse(JSON.stringify(productItem));
-  product.position = shelfRef.products.length;
-  product.x = foundX;
-  product.y = shelfHeightPx - productHeightPx;
-
-  shelfRef.products.push(product);
+  shelfRef.products.push({
+    ...JSON.parse(JSON.stringify(productItem)),
+    position: shelfRef.products.length,
+    x: foundX,
+    y: shelfHeightPx - productHeightPx,
+    isPhysical: true
+  });
 }
 
 function addDecorativeElement(item) {
-  const shelfRef = shelf.value[selectedShelf?.value ?? 0];
+  const shelfRef = shelf.value[selectedShelf.value ?? 0];
   const width = item.width ?? item.dimensions?.width ?? 0;
   const height = item.height ?? item.dimensions?.height ?? 0;
 
-  if (!width || !height) {
-    showSnackbar('Elemento decorativo inválido.');
-    return;
+  if (!width || !height) return showSnackbar('Elemento decorativo inválido.');
+  if (height > shelfRef.height) {
+    return showSnackbar(`O elemento tem ${height}cm, mas a prateleira tem apenas ${shelfRef.height}cm de altura.`);
   }
 
   const shelfWidthPx = cmToPixel(null, shelfRef.width).widthPx;
@@ -161,50 +181,31 @@ function addDecorativeElement(item) {
   const isPhysical = item.isPhysical === true;
 
   if (isPhysical) {
-    posX = shelfRef.products.reduce((acc, p) => {
-      return acc + (p.isPhysical !== false ? cmToPixel(null, p.width).widthPx : 0);
-    }, 0);
-
+    posX = shelfRef.products.reduce((acc, p) => acc + (p.isPhysical !== false ? cmToPixel(null, p.width).widthPx : 0), 0);
     if (canAddProduct(shelfRef.products, shelfRef.width, width)) {
-      showSnackbar('Sem espaço físico na prateleira.');
-      return;
+      return showSnackbar('Sem espaço físico na prateleira.');
     }
   } else {
     posX = (shelfWidthPx - elementWidthPx) / 2;
   }
 
   addProductSound();
-
-  const newElement = {
+  shelfRef.products.push({
     ...JSON.parse(JSON.stringify(item)),
     width,
     height,
     x: posX,
     y: shelfHeightPx - elementHeightPx,
-    isPhysical: isPhysical,
+    isPhysical,
     type: 'decorative'
-  };
-
-  shelfRef.products.push(newElement);
-}
-
-function addShelf() {
-  shelf.value.push({
-    mobiliaryElement: 'Prateleira',
-    height: 40,
-    depth: 0,
-    width: 40,
-    tickness: 2,
-    color: '#E9C46A',
-    products: []
   });
 }
 
-function updateProductsPosition(index) {
-  const currentShelfData = shelf.value[index];
-  const shelfHeight = cmToPixel(currentShelfData.height, null).heightPx;
-  currentShelfData.products.forEach(product => {
-    product.y = shelfHeight - cmToPixel(product.height, null).heightPx;
+function saveProduct(product) {
+  product.forEach(p => {
+    p.x = 0;
+    p.y = 0;
+    productList.value.push(p);
   });
 }
 
@@ -231,8 +232,7 @@ function isColorDark(colorHex) {
   const r = parseInt(hex.substr(0, 2), 16);
   const g = parseInt(hex.substr(2, 2), 16);
   const b = parseInt(hex.substr(4, 2), 16);
-  const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-  return yiq < 128;
+  return ((r * 299) + (g * 587) + (b * 114)) / 1000 < 128;
 }
 
 onMounted(() => {
@@ -249,216 +249,188 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <v-container fluid>
+  <v-container fluid class="pa-0 h-screen d-flex flex-column">
     <template v-if="!loading">
-      <v-row>
-        <v-col class="pa-0" cols="12">
-          <v-card border>
-            <div class="d-flex px-2 py-2 w-100 overflow-x-auto">
-              <div class="d-flex flex-column justify-space-between align-center px-4">
-                <div class="d-flex mb-1 gap-1">
-                  <v-btn :color="showExpansion ? 'success' : 'error'" icon="mdi-form-select" title="Ocultar Expansão" variant="text" @click="doHomeAction('hide-expansion')"></v-btn>
-                  <v-btn :color="showProducts ? 'success' : 'error'" icon="mdi-shopping" title="Ocultar Produtos" variant="text" @click="doHomeAction('hide-products')"></v-btn>
-                  <v-btn :color="showAssets ? 'success' : 'error'" :icon="showAssets ? 'mdi-eye-off' : 'mdi-eye'" title="Exibir Ilustração" variant="text" @click="doHomeAction('hide-asset')"></v-btn>
-                  <v-btn icon="mdi-auto-fix" title="Exibir Elementos Decorativos" variant="text" @click="decorativeElementDialog = true"></v-btn>
-                </div>
-                <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">Exibição</span>
+
+      <v-toolbar density="compact" border elevation="1" class="bg-black">
+        <v-toolbar-title class="text-subtitle-1 font-weight-bold ml-2">Planoghini</v-toolbar-title>
+        <v-divider vertical class="mx-4 my-2"></v-divider>
+
+        <v-btn-group density="compact" variant="flat">
+          <v-btn :color="showProducts ? 'primary' : 'default'" @click="doHomeAction('hide-products')" prepend-icon="mdi-library">Biblioteca</v-btn>
+          <v-btn :color="showExpansion ? 'primary' : 'default'" @click="doHomeAction('hide-expansion')" prepend-icon="mdi-tune">Propriedades</v-btn>
+          <v-btn :color="showAssets ? 'primary' : 'default'" @click="doHomeAction('hide-asset')" :prepend-icon="showAssets ? 'mdi-eye' : 'mdi-eye-off'">Ilustração</v-btn>
+        </v-btn-group>
+
+        <v-spacer></v-spacer>
+
+        <v-btn-group density="compact" variant="outlined" class="mr-4">
+          <v-btn icon="mdi-restore" title="Resetar Posição" @click="doHomeAction('reset-position')"/>
+          <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-left" @click.stop="dragAndDropRef?.doFormatAlign('left', selectedShelf)"/>
+          <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-center" @click.stop="dragAndDropRef?.doFormatAlign('center', selectedShelf)"/>
+          <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-right" @click.stop="dragAndDropRef?.doFormatAlign('right', selectedShelf)"/>
+          <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-justify" @click.stop="dragAndDropRef?.doFormatAlign('justify', selectedShelf)"/>
+        </v-btn-group>
+
+        <v-btn color="success" prepend-icon="mdi-content-save" variant="flat" class="mr-2">Salvar</v-btn>
+      </v-toolbar>
+
+      <v-row no-gutters class="flex-grow-1 overflow-hidden">
+
+        <v-col v-if="showProducts" cols="3" md="2">
+          <v-tabs v-model="leftTab" color="primary" grow density="compact" class="border-b">
+            <v-tab value="products"><v-icon start>mdi-shopping</v-icon> Produtos</v-tab>
+            <v-tab value="decor"><v-icon start>mdi-auto-fix</v-icon> Decoração</v-tab>
+          </v-tabs>
+
+          <v-window v-model="leftTab" class="flex-grow-1 overflow-y-auto">
+            <v-window-item value="products">
+              <v-text-field bg-color="grey-lighten-4" density="compact" hide-details label="Buscar produto" prepend-inner-icon="mdi-magnify" single-line variant="outlined" class="mb-2"/>
+              <div class="flex-grow-1 overflow-y-auto">
+                <v-treeview :items="productList ?? []" activatable color="primary" density="compact" item-value="title" open-on-click rounded>
+                  <template v-slot:prepend="{ item }">
+                    <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-package-variant-closed'"></v-icon>
+                    <v-img v-else :src="item.previewUrl" height="40" width="40" class="rounded"></v-img>
+                  </template>
+                  <template v-slot:title="{ item }">
+                    <div :draggable="!item.children" class="draggable-node py-1" @click.stop="addProduct(item)">
+                      <div class="text-subtitle-2 text-truncate font-weight-medium">{{ item.title }}</div>
+                      <div v-if="item.width && item.height" class="text-caption text-medium-emphasis">{{ item.width }}x{{ item.height }}cm</div>
+                    </div>
+                  </template>
+                </v-treeview>
               </div>
-
-              <v-divider class="my-1 mx-2" vertical></v-divider>
-
-              <div class="d-flex flex-column justify-space-between align-center px-4">
-                <div class="d-flex mb-1">
-                  <v-btn-group density="compact" divided variant="outlined">
-                    <v-btn icon="mdi-restore" title="Resetar Posição" variant="text" @click="doHomeAction('reset-position')"/>
-                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-left" @click.stop="dragAndDropRef?.doFormatAlign('left', selectedShelf)"/>
-                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-center" @click.stop="dragAndDropRef?.doFormatAlign('center', selectedShelf)"/>
-                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-right" @click.stop="dragAndDropRef?.doFormatAlign('right', selectedShelf)"/>
-                    <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-justify" @click.stop="dragAndDropRef?.doFormatAlign('justify', selectedShelf)"/>
-                  </v-btn-group>
-                </div>
-                <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">Canvas</span>
+              <div class="mt-auto pt-2">
+                <v-btn block color="success" variant="tonal" prepend-icon="mdi-plus" class="mb-2" @click.stop="addProductModel = true">Adicionar</v-btn>
+                <v-btn block color="warning" variant="tonal" prepend-icon="mdi-import" @click.stop="importProductModel = true">Importar</v-btn>
               </div>
+            </v-window-item>
 
-              <v-divider class="my-1 mx-2" vertical></v-divider>
-
-              <div class="d-flex flex-column justify-space-between align-center px-4">
-                <div class="d-flex mb-1">
-                  <v-btn icon="mdi-content-save-outline" variant="text"></v-btn>
-                </div>
-                <span class="text-caption text-medium-emphasis text-uppercase" style="font-size: 0.65rem !important;">Ações</span>
-              </div>
-            </div>
-          </v-card>
+            <v-window-item value="decor">
+              <v-text-field bg-color="grey-lighten-4" density="compact" hide-details label="Buscar decoração" prepend-inner-icon="mdi-magnify" single-line variant="outlined" class="mb-2"/>
+              <v-treeview :items="decorativeElementList ?? []" activatable color="primary" density="compact" item-value="title" open-on-click rounded>
+                <template v-slot:prepend="{ item }">
+                  <v-avatar :style="{ backgroundColor: item.color || '#e0e0e0' }" class="mr-2 border" rounded="lg" size="32">
+                    <v-icon :color="isColorDark(item.color) ? 'white' : 'grey-darken-3'" :icon="item.isPhysical ? 'mdi-cube-outline' : 'mdi-sticker-outline'" size="x-small"/>
+                  </v-avatar>
+                </template>
+                <template v-slot:title="{ item }">
+                  <div class="draggable-node py-1" @click.stop="addDecorativeElement(item)">
+                    <div class="text-subtitle-2 font-weight-medium text-truncate">{{ item.title }}</div>
+                    <div class="text-caption text-medium-emphasis">
+                      <v-icon icon="mdi-ruler-square" size="small" class="mr-1"/>{{ item.dimensions?.width }}x{{ item.dimensions?.height }}cm
+                    </div>
+                  </div>
+                </template>
+              </v-treeview>
+            </v-window-item>
+          </v-window>
         </v-col>
 
-        <v-col v-if="showExpansion" cols="12">
-          <v-expansion-panels>
-            <v-expansion-panel>
-              <v-expansion-panel-title v-slot="{ expanded }">
-                <v-row no-gutters>
-                  <v-col class="d-flex justify-start" cols="4">Desenho do módulo</v-col>
-                  <v-col class="text--secondary" cols="8">
-                    <v-fade-transition leave-absolute>
-                      <span v-if="expanded">Customize e adicione prateleiras</span>
-                      <v-row v-else no-gutters style="width: 100%">
-                        <v-col class="d-flex justify-start" cols="6">Possui {{ shelf.length }} colunas</v-col>
-                      </v-row>
-                    </v-fade-transition>
-                  </v-col>
+        <v-col class="h-100 position-relative overflow-hidden d-flex justify-center bg-grey-lighten-3 polka-dot">
+          <template v-if="shelf && shelf.length > 0">
+            <v-sheet class="pa-4 w-100 h-100 polka-dot">
+              <drag-and-drop-shelf ref="dragAndDropRef" v-model:selectedProduct="selectedProduct" v-model:selectedShelf="selectedShelf" v-model:shelf="shelf" :show-assets="showAssets"/>
+            </v-sheet>
+          </template>
+          <template v-else>
+            <div class="ma-auto text-center">
+              <v-img :height="200" :width="200" class="mx-auto" src="https://mystickermania.com/cdn/stickers/spongebob/sb-upset-fish-meme-512x512.png"></v-img>
+              <h2 class="text-h6 mt-2">Nenhuma prateleira adicionada</h2>
+              <v-btn color="primary" class="mt-4" prepend-icon="mdi-plus" @click="addShelf">Criar Prateleira</v-btn>
+            </div>
+          </template>
+        </v-col>
+
+        <v-slide-x-reverse-transition>
+          <v-col v-if="showExpansion || selectedProduct" cols="3" md="3" lg="2" class="border-s bg-white h-100 d-flex flex-column overflow-y-auto">
+
+            <template v-if="selectedProduct">
+              <v-toolbar density="compact" color="black" class="text-white">
+                <v-toolbar-title class="text-subtitle-2">Propriedades do Item</v-toolbar-title>
+                <v-spacer></v-spacer>
+                <v-btn icon="mdi-close" variant="text" size="small" @click="selectedProduct = null"></v-btn>
+              </v-toolbar>
+
+              <div class="pa-4 text-center">
+                <v-img :src="selectedProduct.imageItem.previewUrl" height="120" class="bg-grey-lighten-4 rounded border mb-3 mx-auto"></v-img>
+                <h3 class="text-subtitle-1 font-weight-bold">{{ selectedProduct.imageItem.title }}</h3>
+
+                <div class="text-caption text-medium-emphasis mt-1">
+                  <template v-if="selectedProduct.imageItem.label === 'product'">
+                    <v-icon icon="mdi-barcode" size="small" class="mr-1"/>{{ selectedProduct.imageItem.ean }}
+                  </template>
+                  <template v-else>
+                    <div class="d-flex flex-column">
+                      <div class="d-flex align-center justify-center"><v-icon icon="mdi-palette" size="small" class="mr-1" />{{ selectedProduct.imageItem.color }}</div>
+                      <div class="d-flex align-center justify-center"><v-icon icon="mdi-brush" size="small" class="mr-1" />{{ selectedProduct.imageItem.dimensions.fontSize }}</div>
+                    </div>
+                  </template>
+                </div>
+              </div>
+              <v-divider></v-divider>
+              <div class="pa-4">
+                <div class="text-caption font-weight-bold text-uppercase mb-2">Dimensões (cm)</div>
+                <v-row dense>
+                  <v-col cols="6"><span class="font-weight-bold">Altura:</span> {{ selectedProduct.imageItem.height }}</v-col>
+                  <v-col cols="6"><span class="font-weight-bold">Largura:</span> {{ selectedProduct.imageItem.width }}</v-col>
+                  <v-col cols="6"><span class="font-weight-bold">Profundidade:</span> {{ selectedProduct.imageItem.depth }}</v-col>
                 </v-row>
-              </v-expansion-panel-title>
-              <v-expansion-panel-text>
-                <v-sheet border rounded>
-                  <v-data-table :headers="headers" :items="shelf" density="compact">
-                    <template v-slot:top>
-                      <v-toolbar flat>
-                        <v-toolbar-title>
-                          <v-icon color="medium-emphasis" icon="mdi-cart-check" size="x-small" start></v-icon>
-                          Módulo
-                        </v-toolbar-title>
-                        <v-btn @click.stop="addShelf">Adicionar prateleira</v-btn>
-                      </v-toolbar>
-                    </template>
-                    <template v-slot:item.level="{ index }">{{ index + 1 }}</template>
-                    <template v-slot:item.height="{ index }">
-                      <v-text-field v-model="shelf[index].height" controlVariant="split" density="compact" hide-details type="number" @update:model-value="updateProductsPosition(index)"/>
-                    </template>
-                    <template v-slot:item.width="{ index }">
-                      <v-text-field v-model="shelf[index].width" controlVariant="split" density="compact" hide-details type="number"/>
-                    </template>
-                    <template v-slot:item.tickness="{ index }">
-                      <v-text-field v-model="shelf[index].tickness" controlVariant="split" density="compact" hide-details type="number"/>
-                    </template>
-                    <template v-slot:item.color="{ value, index }">
-                      <v-dialog max-width="500">
-                        <template v-slot:activator="{ props: activatorProps }">
-                          <div :style="{'background-color': value}" class="pa-2" v-bind="activatorProps"/>
-                        </template>
-                        <template v-slot:default>
-                          <v-card title="Dialog">
-                            <v-card-text>
-                              <v-color-picker v-model="shelf[index].color" hide-inputs></v-color-picker>
-                            </v-card-text>
-                          </v-card>
-                        </template>
-                      </v-dialog>
-                    </template>
-                    <template v-slot:item.action="{ index }">
-                      <v-icon color="medium-emphasis" icon="mdi-delete" size="small" @click="shelf.splice(index, 1)"></v-icon>
-                    </template>
-                  </v-data-table>
-                </v-sheet>
-              </v-expansion-panel-text>
-            </v-expansion-panel>
-          </v-expansion-panels>
-        </v-col>
-
-        <v-slide-y-transition>
-          <v-card v-if="selectedProduct" border class="product-detail-card ma-4" elevation="4" max-width="350" rounded="lg">
-            <div class="d-flex flex-no-wrap justify-space-between align-center">
-              <v-img :src="selectedProduct.imageItem.previewUrl" height="50" width="50"></v-img>
-              <div class="d-flex flex-column justify-center py-2 pr-2 w-100">
-                <div>
-                  <div class="text-subtitle-1 font-weight-bold text-truncate" style="max-width: 200px">
-                    {{ selectedProduct.imageItem.title }}
-                  </div>
-                  <div class="text-caption text-medium-emphasis mb-2">
-                    <template v-if="selectedProduct.imageItem.label === 'product'">
-                      <v-icon icon="mdi-barcode" size="small" start/>{{ selectedProduct.imageItem.ean }}
-                    </template>
-                    <template v-else>
-                      <div class="d-flex flex-column">
-                        <div class="d-flex align-center"><v-icon icon="mdi-palette" size="small" class="mr-1" />{{ selectedProduct.imageItem.color }}</div>
-                        <div class="d-flex align-center"><v-icon icon="mdi-brush" size="small" class="mr-1" />{{ selectedProduct.imageItem.dimensions.fontSize }}</div>
-                      </div>
-                    </template>
-                  </div>
-                </div>
-                <div class="d-flex gap-1">
-                  <v-chip class="px-1" color="primary" label size="x-small" variant="tonal">A: {{ selectedProduct.imageItem.height }}cm</v-chip>
-                  <v-chip class="px-1 ml-1" color="primary" label size="x-small" variant="tonal">L: {{ selectedProduct.imageItem.width }}cm</v-chip>
-                  <v-chip class="px-1 ml-1" color="primary" label size="x-small" variant="tonal">P: {{ selectedProduct.imageItem.depth ?? 0 }}cm</v-chip>
-                </div>
               </div>
-              <div class="pa-1 align-self-start">
-                <v-btn color="grey" density="compact" icon="mdi-close" size="small" variant="text" @click="selectedProduct = null"></v-btn>
+            </template>
+
+            <template v-else-if="showExpansion">
+              <v-toolbar density="compact" color="blue-grey-lighten-5">
+                <v-toolbar-title class="text-subtitle-2">Gerenciar Módulo</v-toolbar-title>
+                <v-spacer></v-spacer>
+                <v-btn icon="mdi-plus" variant="text" size="small" color="success" @click.stop="addShelf" title="Adicionar Prateleira"></v-btn>
+              </v-toolbar>
+
+              <div class="pa-2 h-100 bg-black">
+                <v-expansion-panels variant="accordion" class="border rounded">
+                  <v-expansion-panel v-for="(shelfItem, index) in shelf" :key="index">
+                    <v-expansion-panel-title class="px-3 py-2">
+                      <div class="d-flex align-center w-100">
+                        <v-avatar size="16" :color="shelfItem.color" class="mr-2"></v-avatar>
+                        <span class="text-body-2 font-weight-medium">Nível {{ index + 1 }}</span>
+                        <v-spacer></v-spacer>
+                        <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click.stop="shelf.splice(index, 1)"></v-btn>
+                      </div>
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text class="px-0 py-2 bg-grey-lighten-4">
+                      <v-row dense class="px-2">
+                        <v-col cols="6">
+                          <v-text-field v-model="shelfItem.height" label="Altura" density="compact" bg-color="white" variant="outlined" hide-details type="number" :min="getShelfMinHeight(index)" @update:model-value="validateShelfDimension(index, 'height', $event)"/>
+                        </v-col>
+                        <v-col cols="6">
+                          <v-text-field v-model="shelfItem.width" label="Largura" density="compact" bg-color="white" variant="outlined" hide-details type="number" :min="getShelfMinWidth(index)" @update:model-value="validateShelfDimension(index, 'width', $event)"/>
+                        </v-col>
+                        <v-col cols="6">
+                          <v-text-field v-model="shelfItem.tickness" label="Espessura" density="compact" bg-color="white" variant="outlined" hide-details type="number"/>
+                        </v-col>
+                        <v-col cols="6">
+                          <v-menu :close-on-content-click="false">
+                            <template v-slot:activator="{ props }">
+                              <v-btn v-bind="props" block height="40" variant="outlined" :color="shelfItem.color" class="bg-white">Cor</v-btn>
+                            </template>
+                            <v-color-picker v-model="shelfItem.color" hide-inputs></v-color-picker>
+                          </v-menu>
+                        </v-col>
+                      </v-row>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
               </div>
-            </div>
-          </v-card>
-        </v-slide-y-transition>
-
-        <v-col cols="12">
-          <v-row>
-            <v-col v-if="showProducts" cols="2">
-              <v-card :disabled="shelf.length === 0" color="white">
-                <v-text-field bg-color="white" density="compact" hide-details label="Selecione o produto" prepend-inner-icon="mdi-magnify" single-line variant="outlined"/>
-                <v-treeview :items="productList ?? []" activatable bg-color="white" border color="primary" density="compact" fluid open-on-click rounded>
-                  <template v-slot:prepend="{ item }">
-                    <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-magnify'"></v-icon>
-                    <v-img v-else :src="item.previewUrl" height="50" width="50"></v-img>
-                  </template>
-                  <template v-slot:title="{ item }">
-                    <div :draggable="!item.children" class="draggable-node" @click.stop="addProduct(item)">
-                      <p :class="item.label === 'category'? 'text-subtitle-1' : 'text-subtitle-1 custom-line'">{{ item.title }}</p>
-                      <p v-if="item.width && item.height" class="text-caption font-italic">{{ item.width }}cm/{{ item.height }}cm</p>
-                    </div>
-                  </template>
-                </v-treeview>
-                <v-btn block color="success" prepend-icon="mdi-plus" @click.stop="addProductModel = true">Adicionar produto</v-btn>
-                <v-btn block color="warning" prepend-icon="mdi-import" @click.stop="importProductModel = true">Exportar produto</v-btn>
-              </v-card>
-
-              <v-card :disabled="shelf.length === 0" color="white">
-                <v-text-field bg-color="white" density="compact" hide-details label="Selecione o elemento decorativo" prepend-inner-icon="mdi-magnify" single-line variant="outlined"/>
-                <v-treeview :items="decorativeElementList ?? []" activatable bg-color="white" border color="primary" density="compact" item-value="text" open-on-click rounded>
-                  <template v-slot:prepend="{ item }">
-                    <v-avatar :style="{ backgroundColor: item.color || '#e0e0e0' }" class="mr-2 border" rounded="lg" size="32">
-                      <v-icon :color="isColorDark(item.color) ? 'white' : 'grey-darken-3'" :icon="item.isPhysical ? 'mdi-cube-outline' : 'mdi-sticker-outline'" size="x-small"/>
-                    </v-avatar>
-                  </template>
-                  <template v-slot:title="{ item }">
-                    <div class="draggable-node py-1" @click.stop="addDecorativeElement(item)">
-                      <div class="d-flex align-center justify-space-between">
-                        <span class="text-subtitle-2 font-weight-bold text-truncate">{{ item.title }}</span>
-                      </div>
-                      <div class="d-flex align-center text-caption text-medium-emphasis mt-1">
-                        <v-icon class="mr-1 opacity-60" icon="mdi-ruler-square" size="12" start/>
-                        <span>{{ item.dimensions?.width }}cm <span class="text-disabled">x</span> {{ item.dimensions?.height }}cm</span>
-                      </div>
-                    </div>
-                  </template>
-                  <template v-slot:append>
-                    <v-icon color="grey-lighten-1" icon="mdi-drag-vertical" size="small"></v-icon>
-                  </template>
-                </v-treeview>
-              </v-card>
-            </v-col>
-
-            <template v-if="shelf && shelf.length > 0">
-              <v-col>
-                <v-sheet ref="canvasRef" class="custom-border pa-2 polka-dot" max-height="800" min-height="800">
-                  <drag-and-drop-shelf ref="dragAndDropRef" v-model:selectedProduct="selectedProduct" v-model:selectedShelf="selectedShelf" v-model:shelf="shelf" :show-assets="showAssets"/>
-                </v-sheet>
-              </v-col>
             </template>
-            <template v-else>
-              <v-col>
-                <v-card>
-                  <v-empty-state headline="Nenhuma prateleira adicionada" icon="mdi-cart-off" title="Como você quer planogramar sem prateleiras">
-                    <template v-slot:media>
-                      <v-img :height="300" :width="500" class="ma-auto" src="https://mystickermania.com/cdn/stickers/spongebob/sb-upset-fish-meme-512x512.png"></v-img>
-                    </template>
-                  </v-empty-state>
-                </v-card>
-              </v-col>
-            </template>
-          </v-row>
-        </v-col>
+            
+          </v-col>
+        </v-slide-x-reverse-transition>
+
       </v-row>
     </template>
+
     <template v-else>
-      <v-container class="d-flex justify-center align-center" height="90vh">
+      <v-container class="d-flex justify-center align-center h-100">
         <loading-state/>
       </v-container>
     </template>
@@ -472,36 +444,40 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.custom-line { line-height: 1.0; }
-.custom-border { border: 2px solid white; }
+.h-screen { height: 100vh; }
+.custom-line { line-height: 1.1; }
+.grayscale { filter: grayscale(100%); }
 
 .polka-dot {
-  position: relative;
-  background-color: rgba(255, 255, 255, 1);
-  background-image: radial-gradient(#dfdfe4 2px, transparent 2px);
-  background-size: 15px 15px;
+  background-color: #f5f5f5;
+  background-image: radial-gradient(#d7d7dc 2px, transparent 1px);
+  background-size: 20px 20px;
 }
 
-.polka-dot::before {
-  position: absolute;
-  inset: 0;
-  font-family: "Comic Sans MS", "Comic Sans", cursive, sans-serif;
-  font-size: 40px;
-  font-weight: bold;
-  color: rgba(0, 0, 0, 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 0;
+.draggable-node {
+  cursor: grab;
+  transition: background-color 0.2s;
+  border-radius: 4px;
+}
+.draggable-node:hover {
+  background-color: rgba(25, 118, 210, 0.05);
+}
+.draggable-node:active {
+  cursor: grabbing;
 }
 
-.polka-dot > * { position: relative; z-index: 1; }
-
-.product-detail-card {
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  z-index: 100;
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #bdbdbd;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9e9e9e;
 }
 </style>
