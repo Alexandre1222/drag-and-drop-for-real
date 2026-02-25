@@ -44,7 +44,7 @@ const previewStyle = computed(() => ({
   opacity: 0.6,
   border: dragPreview.isPhysical ? '2px solid #000' : '2px dashed #1976D2',
   pointerEvents: 'none',
-  borderRadius: dragPreview.shape === 'circle' ? '50%' : '4px',
+  borderRadius: dragPreview.shape === 'circle' ? '50%' : dragPreview.shape === 'line' ? '2px' : '4px',
   zIndex: 100,
 }));
 
@@ -147,6 +147,7 @@ function onDragStart(item, itemIndex, shelfIndex, event) {
   dragPreview.height = heightPx;
   dragPreview.ean = item.ean || 'decor';
   dragPreview.isPhysical = item.isPhysical !== false;
+  dragPreview.shape = item.shape || 'rectangle';
 
   draggedItem.value = {
     item,
