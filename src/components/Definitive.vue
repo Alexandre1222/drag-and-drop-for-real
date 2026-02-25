@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, nextTick } from "vue";
 import { useSound } from '@vueuse/sound';
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
+import AddDecorativeElementDialog from "@/components/dialog/addDecorativeElementDialog.vue";
 import EditProductDialog from "@/components/dialog/editProductDialog.vue";
 import EditShelfDialog from "@/components/dialog/editShelfDialog.vue";
 import ImportProductDialog from "@/components/dialog/importProductDialog.vue";
@@ -23,6 +24,7 @@ const showAssets = ref(false);
 const loading = ref(false);
 
 const addProductModel = ref(false);
+const addDecorativeModel = ref(false);
 const editProductModel = ref(false);
 const editShelfModel = ref(false);
 const importProductModel = ref(false);
@@ -218,6 +220,11 @@ function saveProduct(product) {
   });
 }
 
+function saveDecorativeElement(product) {
+  console.log('Decorative element saved:', product);
+decorativeElementList.value.push(...product);
+}
+
 function handleKeydown(e) {
   if (e.ctrlKey && e.key === 'k') {
     e.preventDefault();
@@ -349,6 +356,8 @@ onUnmounted(() => {
                   </div>
                 </template>
               </v-treeview>
+              <v-btn block color="success" variant="tonal" prepend-icon="mdi-plus" class="mb-2"
+                  @click.stop="addDecorativeModel = true">Adicionar</v-btn>
             </v-window-item>
           </v-window>
         </v-col>
@@ -500,6 +509,7 @@ onUnmounted(() => {
   </v-container>
 
   <add-product-dialog v-model="addProductModel" @save-product="saveProduct" />
+  <add-decorative-element-dialog v-model="addDecorativeModel" @save-decorative-element="saveDecorativeElement" />
   <edit-product-dialog v-model="editProductModel" />
   <edit-shelf-dialog v-model="editShelfModel" :current-shelf="currentShelf" :currentShelfIndex="shelfIndexToDelete"
     @edit-shelf="editShelf" />

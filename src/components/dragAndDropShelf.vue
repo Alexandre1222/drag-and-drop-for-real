@@ -27,7 +27,7 @@ const shelfMenu = ref(false);
 const menuTarget = ref(null);
 const currentFocus = ref(null);
 const dragShow = ref([]);
-const dragPreview = reactive({x: 0, y: 0, width: 0, height: 0, ean: '', isPhysical: true});
+const dragPreview = reactive({x: 0, y: 0, width: 0, height: 0, ean: '', isPhysical: true, shape: 'rectangle'});
 
 const {play: deleteSound} = useSound(bonk, {volume: 0.4, interrupt: true});
 const {play: addMagicSound} = useSound(magic, {volume: 0.5, interrupt: true});
@@ -44,11 +44,12 @@ const previewStyle = computed(() => ({
   opacity: 0.6,
   border: dragPreview.isPhysical ? '2px solid #000' : '2px dashed #1976D2',
   pointerEvents: 'none',
-  borderRadius: '4px',
-  zIndex: 100
+  borderRadius: dragPreview.shape === 'circle' ? '50%' : '4px',
+  zIndex: 100,
 }));
 
 const getProductStyle = (imageItem) => {
+  console.log('Calculating style for item:', imageItem);
   const {heightPx, widthPx} = cmToPixel(imageItem.height, imageItem.width);
   const hasImage = props.showAssets && imageItem.previewUrl;
   return {
@@ -58,6 +59,7 @@ const getProductStyle = (imageItem) => {
     width: `${widthPx}px`,
     backgroundColor: hasImage ? 'rgba(0,0,0,0)' : (imageItem.color || stringToColour(imageItem.ean)),
     zIndex: imageItem.isPhysical ? 0 : 200,
+    borderRadius: imageItem.shape === 'circle' ? '50%' : '4px',
   };
 };
 
@@ -121,6 +123,7 @@ function action(method) {
   if (method === "delete") {
     shelf.value[shelfIdx].products.splice(pIdx, 1);
     menu.value = false;
+    selectedProduct.value = null;
     deleteSound();
   } else if (method === "togglePhysics") {
     product.isPhysical = !product.isPhysical;
@@ -276,8 +279,9 @@ const onDragOver = (event, shelfHeight, shelfIndex) => {
   }
   const draggedWidthPx = cmToPixel(null, draggedItem.value.item.width).widthPx
   const collision = hasHorizontalCollision(destShelf.products, draggedItem.value.index, dragPreview.x, draggedWidthPx, dragPreview.isPhysical);
-
   previewStyle.value.backgroundColor = collision ? "#ff2c2c" : stringToColour(dragPreview.ean);
+  previewStyle.value.borderRadius = dragPreview.shape === 'circle' ? '50%' : '4px';
+  console.log('Drag preview style:', previewStyle.value);
 };
 
 function onFocus(currentImage) { currentFocus.value = currentImage; }
