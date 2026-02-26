@@ -1,7 +1,7 @@
 <script setup>
 import {onMounted, ref, shallowRef, toRef} from "vue";
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
-import cmToPixel from "@/plugins/helper/cmToPixel.js";
+import cmToPixel from "@/plugins/helper/cmToPixel";
 import productsDb from '@/plugins/database/products.json'
 import LoadingState from "@/components/loadingState.vue";
 import CustomSnackbar from "@/components/CustomSnackbar.vue";
@@ -12,7 +12,7 @@ import bonk from '@/assets/sounds/bonk.mp3'
 import minecraftClick from '@/assets/sounds/minecraftClick.mp3'
 import magic from '@/assets/sounds/magic.mp3'
 import ImportProductDialog from "@/components/dialog/importProductDialog.vue";
-import {stringToColour} from "@/plugins/helper/stringToColour.js";
+import {stringToColour} from "@/plugins/helper/stringToColour";
 
 const {play: deleteSound} = useSound(bonk, {
   volume: 0.4,

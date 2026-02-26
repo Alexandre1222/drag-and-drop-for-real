@@ -11,8 +11,8 @@ import DragAndDropShelf from "@/components/dragAndDropShelf.vue";
 import LoadingState from "@/components/loadingState.vue";
 import productsDb from '@/plugins/database/products.json';
 import decorativeElementDb from '@/plugins/database/decorativeElement.json';
-import cmToPixel from "@/plugins/helper/cmToPixel.js";
-import { showSnackbar } from "@/plugins/helper/customSnackbar.js";
+import cmToPixel from "@/plugins/helper/cmToPixel";
+import { showSnackbar } from "@/plugins/helper/customSnackbar";
 import minecraftClick from '@/assets/sounds/minecraftClick.mp3';
 
 const { play: addProductSound } = useSound(minecraftClick, { volume: 1, interrupt: true });

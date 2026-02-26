@@ -2,9 +2,9 @@
 import {computed, onMounted, reactive, ref} from "vue";
 import {useSound} from "@vueuse/sound";
 import Panzoom from '@panzoom/panzoom';
-import cmToPixel from "@/plugins/helper/cmToPixel.js";
-import {stringToColour} from "@/plugins/helper/stringToColour.js";
-import {showSnackbar} from "@/plugins/helper/customSnackbar.js";
+import cmToPixel from "@/plugins/helper/cmToPixel";
+import {stringToColour} from "@/plugins/helper/stringToColour";
+import {showSnackbar} from "@/plugins/helper/customSnackbar";
 import WelcomeDialog from "@/components/dialog/welcomeDialog.vue";
 import bonk from "@/assets/sounds/bonk.mp3";
 import magic from "@/assets/sounds/magic.mp3";

@@ -12,6 +12,6 @@
 <script setup>
 import Definitive from "@/components/Definitive.vue";
 import CustomSnackbar from "@/components/CustomSnackbar.vue";
-import {snackbarState} from "@/plugins/helper/customSnackbar.js";
+import {snackbarState} from "@/plugins/helper/customSnackbar";
 const snackbar = snackbarState;
 </script>

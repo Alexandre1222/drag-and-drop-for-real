@@ -113,7 +113,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import cmToPixel from "@/plugins/helper/cmToPixel.js";
+import cmToPixel from "@/plugins/helper/cmToPixel";
 const dialog = defineModel()
 const emits = defineEmits(['save-product'])
 
