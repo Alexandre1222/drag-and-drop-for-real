@@ -70,10 +70,14 @@ const shelf = ref<Shelf[]>([
 const selectedShelf = ref<number | null>(null);
 const selectedProduct = ref<SelectedProduct | null>(null);
 
+function getEffectiveWidth(product: { width: number; quantity?: number }): number {
+  return product.width * (product.quantity ?? 1);
+}
+
 function getShelfMinWidth(index: number) {
   if (!shelf.value[index]) return 1;
   const physicalProducts = shelf.value[index].products.filter(p => p.isPhysical !== false);
-  return physicalProducts.reduce((sum, p) => sum + p.width, 0) || 1;
+  return physicalProducts.reduce((sum, p) => sum + getEffectiveWidth(p), 0) || 1;
 }
 
 function getShelfMinHeight(index: number) {
@@ -133,28 +137,30 @@ function updateProductsPosition(index: number) {
 }
 
 function canAddProduct(currentShelfProducts: Product[], currentShelfWidth: number, productWidth: number) {
-  const widthAccumulated = currentShelfProducts.reduce((acc, p) => acc + p.width, 0);
+  const widthAccumulated = currentShelfProducts.reduce((acc, p) => acc + getEffectiveWidth(p), 0);
   return (productWidth + widthAccumulated) > currentShelfWidth;
 }
 
 function addProduct(productItem: ProductItem) {
   if (productItem.label === 'category') return;
-
+  if (selectedShelf.value == null || selectedShelf.value == undefined) return;
   const shelfRef = shelf.value[selectedShelf.value ?? 0];
   const physicalProducts = shelfRef.products.filter(p => p.isPhysical !== false);
+  const quantity = (productItem as Record<string, unknown>).quantity as number | undefined ?? 1;
   const width = productItem.width ?? 0;
+  const effectiveWidth = width * quantity;
   const height = productItem.height ?? 0;
 
   if (height > shelfRef.height) {
     return showSnackbar(`O produto tem ${height}cm, mas a prateleira tem apenas ${shelfRef.height}cm de altura.`);
   }
 
-  if (canAddProduct(physicalProducts, shelfRef.width, width)) {
+  if (canAddProduct(physicalProducts, shelfRef.width, effectiveWidth)) {
     return showSnackbar('Limite de espaço atingido na prateleira.');
   }
 
   const shelfWidthPx = cmToPixel(null, shelfRef.width).widthPx;
-  const productWidthPx = cmToPixel(null, width).widthPx;
+  const productWidthPx = cmToPixel(null, effectiveWidth).widthPx;
   const shelfHeightPx = cmToPixel(shelfRef.height, null).heightPx;
   const productHeightPx = cmToPixel(height, null).heightPx;
 
@@ -166,7 +172,7 @@ function addProduct(productItem: ProductItem) {
   } else {
     for (let i = 0; i < sortedProducts.length; i++) {
       const current = sortedProducts[i];
-      const candidateX = current.x + cmToPixel(null, current.width).widthPx;
+      const candidateX = current.x + cmToPixel(null, getEffectiveWidth(current)).widthPx;
       const nextX = sortedProducts[i + 1]?.x ?? shelfWidthPx;
 
       if (nextX - candidateX >= productWidthPx) {
@@ -183,6 +189,7 @@ function addProduct(productItem: ProductItem) {
   addProductSound();
   shelfRef.products.push({
     ...JSON.parse(JSON.stringify(productItem)),
+    quantity,
     position: shelfRef.products.length,
     x: foundX,
     y: shelfHeightPx - productHeightPx,
@@ -209,7 +216,7 @@ function addDecorativeElement(item: DecorativeItem) {
   const isPhysical = item.isPhysical === true;
 
   if (isPhysical) {
-    posX = shelfRef.products.reduce((acc, p) => acc + (p.isPhysical !== false ? cmToPixel(null, p.width).widthPx : 0), 0);
+    posX = shelfRef.products.reduce((acc, p) => acc + (p.isPhysical !== false ? cmToPixel(null, getEffectiveWidth(p)).widthPx : 0), 0);
     if (canAddProduct(shelfRef.products, shelfRef.width, width)) {
       return showSnackbar('Sem espaço físico na prateleira.');
     }
@@ -247,7 +254,6 @@ function saveProduct(product: ProductItem[]) {
 }
 
 function saveDecorativeElement(product: DecorativeItem[]) {
-  console.log('Decorative element saved:', product);
   decorativeElementList.value!.push(...product);
 }
 
@@ -337,17 +343,51 @@ onUnmounted(() => {
               <v-text-field bg-color="grey-lighten-4" density="compact" hide-details label="Buscar produto"
                 prepend-inner-icon="mdi-magnify" single-line variant="outlined" class="mb-2" />
               <div class="flex-grow-1 overflow-y-auto">
-                <v-treeview :items="productList ?? []" activatable color="primary" density="compact" item-value="title"
-                  open-on-click rounded>
+                <v-treeview
+                  :items="productList ?? []"
+                  activatable
+                  color="primary"
+                  density="compact"
+                  item-value="title"
+                  open-on-click
+                  rounded
+                >
                   <template v-slot:prepend="{ item }">
                     <v-icon v-if="!item?.previewUrl" :icon="item?.icon ?? 'mdi-package-variant-closed'"></v-icon>
-                    <v-img v-else :src="item.previewUrl" height="40" width="40" class="rounded"></v-img>
+                    <v-img v-else :src="item.previewUrl" height="40" width="40" class="rounded border flex-shrink-0"></v-img>
                   </template>
+
                   <template v-slot:title="{ item }">
-                    <div :draggable="!item.children" class="draggable-node py-1" @click.stop="addProduct(item)">
-                      <div class="text-subtitle-2 text-truncate font-weight-medium">{{ item.title }}</div>
-                      <div v-if="item.width && item.height" class="text-caption text-medium-emphasis">{{ item.width
-                        }}x{{ item.height }}cm</div>
+                    <div class="d-flex flex-column justify-center w-100 py-2 pr-2">
+
+                      <div
+                        :draggable="!item.children"
+                        class="draggable-node cursor-pointer"
+                        @click.stop="addProduct(item)"
+                      >
+                        <div
+                          class="text-subtitle-2 font-weight-medium"
+                          style="line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal;"
+                        >
+                          {{ item.title }}
+                        </div>
+                        <div v-if="item.width && item.height" class="text-caption text-medium-emphasis mt-1">
+                          {{ item.width }}x{{ item.height }}cm
+                        </div>
+                      </div>
+
+                      <div v-if="!item.children" class="mt-2" @click.stop>
+                        <v-number-input
+                          v-model="(item as any).quantity"
+                          :min="1"
+                          density="compact"
+                          hide-details
+                          variant="outlined"
+                          control-variant="stacked"
+                          class="w-100"
+                        ></v-number-input>
+                      </div>
+
                     </div>
                   </template>
                 </v-treeview>

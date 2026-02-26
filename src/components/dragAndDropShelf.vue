@@ -59,6 +59,10 @@ const {play: deleteSound} = useSound(bonk, {volume: 0.4, interrupt: true});
 const {play: addMagicSound} = useSound(magic, {volume: 0.5, interrupt: true});
 const {play: deleteShelfSound} = useSound(mine, {volume: 0.5, interrupt: true});
 
+function getEffectiveWidth(product: { width: number; quantity?: number }): number {
+  return product.width * (product.quantity ?? 1);
+}
+
 defineExpose({resetPosition, doFormatAlign} as { resetPosition: () => void; doFormatAlign: (align: AlignType, shelfIndex: number) => void });
 
 const previewStyle = computed(() => ({
@@ -75,8 +79,8 @@ const previewStyle = computed(() => ({
 }));
 
 const getProductStyle = (imageItem: Product) => {
-  console.log('Calculating style for item:', imageItem);
-  const {heightPx, widthPx} = cmToPixel(imageItem.height, imageItem.width);
+  const effectiveWidth = getEffectiveWidth(imageItem);
+  const {heightPx, widthPx} = cmToPixel(imageItem.height, effectiveWidth);
   const hasImage = props.showAssets && imageItem.previewUrl;
   return {
     top: `${imageItem.y}px`,
@@ -99,7 +103,7 @@ const getProductClasses = (imageItem: Product, itemIndex: number, shelfIndex: nu
   };
 };
 
-function hasHorizontalCollision(products: Product[], indexToIgnore: number | Product | null, newX: number, draggedWidth: number, isItemPhysical: boolean) {
+function hasHorizontalCollision(products: Product[], indexToIgnore: number | null, newX: number, draggedWidth: number, isItemPhysical: boolean) {
   if (!isItemPhysical || !products) return false;
 
   const draggedStart = newX;
@@ -110,7 +114,7 @@ function hasHorizontalCollision(products: Product[], indexToIgnore: number | Pro
       return false;
     }
 
-    const itemWidthPx = cmToPixel(null, item.width).widthPx;
+    const itemWidthPx = cmToPixel(null, getEffectiveWidth(item)).widthPx;
     const itemStart = item.x;
     const itemEnd = item.x + itemWidthPx;
     return (draggedStart < itemEnd) && (draggedEnd > itemStart);
@@ -160,14 +164,15 @@ function action(method: string) {
 }
 
 function canAddProduct(currentShelfProducts: Product[], currentShelfWidth: number, productWidth: number) {
-  const widthAccumulated = currentShelfProducts.reduce((acc, p) => acc + (p.isPhysical ? p.width : 0), 0);
+  const widthAccumulated = currentShelfProducts.reduce((acc, p) => acc + (p.isPhysical ? getEffectiveWidth(p) : 0), 0);
   return (productWidth + widthAccumulated) > currentShelfWidth;
 }
 
 function onDragStart(item: Product, itemIndex: number, shelfIndex: number, event: DragEvent) {
   const element = (event.target as HTMLElement).closest('.image-item') || event.target as HTMLElement;
   const rect = (element as HTMLElement).getBoundingClientRect();
-  const {widthPx, heightPx} = cmToPixel(item.height, item.width);
+  const effectiveWidth = getEffectiveWidth(item);
+  const {widthPx, heightPx} = cmToPixel(item.height, effectiveWidth);
   const currentScale = panzoomRef.value!.getScale();
 
   dragShow.value[shelfIndex] = true;
@@ -200,7 +205,7 @@ function doFormatAlign(align: AlignType, shelfIndex: number) {
 
   const productsWithWidth = sortedProducts.map(product => ({
     product,
-    widthPx: cmToPixel(null, product.width).widthPx
+    widthPx: cmToPixel(null, getEffectiveWidth(product)).widthPx
   }));
 
   const totalProductsWidth = productsWithWidth.reduce((acc, item) => acc + item.widthPx, 0);
@@ -239,7 +244,7 @@ function onDrop(index: number, event: DragEvent, shelfHeight: number = 0) {
       showSnackbar(`Produto muito alto para esta prateleira.`);
       return;
     }
-    if (sourceIndex !== index && canAddProduct(destShelf.products, destShelf.width, draggedProduct.width)) {
+    if (sourceIndex !== index && canAddProduct(destShelf.products, destShelf.width, getEffectiveWidth(draggedProduct))) {
       showSnackbar(`Limite atingido nesta prateleira.`);
       return;
     }
@@ -251,8 +256,8 @@ function onDrop(index: number, event: DragEvent, shelfHeight: number = 0) {
   const mouseRelX = (event.clientX - containerRect.left) / currentScale;
   const finalX = mouseRelX - draggedItem.value.offsetX;
 
-  const itemToIgnore = (sourceIndex === index) ? draggedProduct : null;
-  const draggedWidthPx = cmToPixel(null, draggedItem.value.item.width).widthPx
+  const itemToIgnore = (sourceIndex === index) ? draggedIndex : null;
+  const draggedWidthPx = cmToPixel(null, getEffectiveWidth(draggedItem.value.item)).widthPx
   if (isPhysical && hasHorizontalCollision(destShelf.products, itemToIgnore, finalX, draggedWidthPx, true)) {
     showSnackbar('Não é possível soltar o produto sobre outro');
     return;
@@ -306,11 +311,10 @@ const onDragOver = (event: DragEvent, shelfHeight: number, shelfIndex: number) =
   } else {
     dragPreview.y = mouseRelY - draggedItem.value!.offsetY;
   }
-  const draggedWidthPx = cmToPixel(null, draggedItem.value!.item.width).widthPx
+  const draggedWidthPx = cmToPixel(null, getEffectiveWidth(draggedItem.value!.item)).widthPx
   const collision = hasHorizontalCollision(destShelf.products, draggedItem.value!.index, dragPreview.x, draggedWidthPx, dragPreview.isPhysical);
   (previewStyle.value as Record<string, unknown>).backgroundColor = collision ? "#ff2c2c" : stringToColour(dragPreview.ean);
   (previewStyle.value as Record<string, unknown>).borderRadius = dragPreview.shape === 'circle' ? '50%' : '4px';
-  console.log('Drag preview style:', previewStyle.value);
 };
 
 function onFocus(currentImage: Product) { currentFocus.value = currentImage; }
@@ -369,11 +373,16 @@ onMounted(() => {
                @dragend.stop="onDragEnd"
                @contextmenu.prevent.stop="openMenu(itemIndex, index, $event)">
 
-            <v-img v-if="showAssets && imageItem.previewUrl" :src="imageItem.previewUrl" cover/>
-            <div v-else-if="!imageItem.previewUrl"
-                 :style="{'font-size': imageItem?.dimensions?.fontSize ? imageItem.dimensions.fontSize : '0pt', 'line-height': '1.1'}"
-                 class="d-flex align-center justify-center text-center h-100">
-              {{ imageItem.text || imageItem.title || 'Item' }}
+            <div v-if="showAssets && imageItem.previewUrl" class="d-flex h-100">
+              <v-img v-for="q in (imageItem.quantity ?? 1)" :key="q" :src="imageItem.previewUrl" cover
+                     :style="{ width: `${100 / (imageItem.quantity ?? 1)}%`, flexShrink: 0 }" />
+            </div>
+            <div v-else-if="!imageItem.previewUrl" class="d-flex h-100">
+              <div v-for="q in (imageItem.quantity ?? 1)" :key="q"
+                   :style="{'font-size': imageItem?.dimensions?.fontSize ? imageItem.dimensions.fontSize : '0pt', 'line-height': '1.1', width: `${100 / (imageItem.quantity ?? 1)}%`}"
+                   class="d-flex align-center justify-center text-center h-100">
+                {{ imageItem.text || imageItem.title || 'Item' }}
+              </div>
             </div>
           </div>
 
