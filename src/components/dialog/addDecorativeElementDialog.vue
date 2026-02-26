@@ -111,11 +111,24 @@
   </v-dialog>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import cmToPixel from "@/plugins/helper/cmToPixel";
-const dialog = defineModel()
-const emits = defineEmits(['save-product'])
+const dialog = defineModel<boolean>()
+const emits = defineEmits<{
+  'save-decorative-element': [items: Array<{
+    title: string
+    type: 'decorative'
+    isPhysical: false
+    width: number
+    height: number
+    color: string
+    borderColor: string
+    text: string
+    shape: string
+    dimensions: { fontSize: string; width: number; height: number }
+  }>]
+}>()
 
 const form = ref({
   nome: 'Elemento decorativo 1',
@@ -129,8 +142,6 @@ const form = ref({
 
 // Calcula estilos visuais dinâmicos
 const previewStyle = computed(() => {
-  // Escala para caber na div de preview (ex: 1cm = 2px no preview, para caber bem visualmente)
-  const scale = 2
   const { heightPx, widthPx } = cmToPixel(form.value.altura, form.value.largura);
   
   const baseStyle = {

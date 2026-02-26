@@ -1,22 +1,21 @@
-<script setup>
-import {ref} from "vue";
-const model = defineModel()
-const emit = defineEmits(['editShelf'])
-const props = defineProps({
-  currentShelf: {},
-  currentShelfIndex:{}
-})
-const form = ref(null)
+<script setup lang="ts">
+import { ref } from "vue";
+import type { Shelf } from '@/types'
 
+const model = defineModel<boolean>()
+const emit = defineEmits<{
+  editShelf: [height: number, index: number]
+}>()
+const props = defineProps<{
+  currentShelf: Shelf | null
+  currentShelfIndex: number | null
+}>()
 const formData = ref({
   height: 0,
 })
 
 function editProduct () {
-  const produto = {
-    height: formData.value.height,
-  }
-  emit('editShelf', produto.height, props.currentShelfIndex)
+  emit('editShelf', formData.value.height, props.currentShelfIndex!)
   reset()
   model.value = false
 }
@@ -33,7 +32,7 @@ function reset(){
 }
 
 function initialize(){
-  formData.value.height = props.currentShelf.height
+  formData.value.height = props.currentShelf!.height
 }
 </script>
 

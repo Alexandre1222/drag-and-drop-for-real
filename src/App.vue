@@ -9,7 +9,7 @@
   </v-app>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import Definitive from "@/components/Definitive.vue";
 import CustomSnackbar from "@/components/CustomSnackbar.vue";
 import {snackbarState} from "@/plugins/helper/customSnackbar";

@@ -36,8 +36,14 @@
   </v-footer>
 </template>
 
-<script setup>
-  const items = [
+<script setup lang="ts">
+  interface FooterItem {
+    title: string
+    icon: string | string[]
+    href: string
+  }
+
+  const items: FooterItem[] = [
     {
       title: 'Vuetify Documentation',
       icon: `$vuetify`,

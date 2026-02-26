@@ -1,13 +1,11 @@
-<script setup>
-const model = defineModel()
-defineProps({
-  products: {
-    default: []
-  },
-  shelf: {
-    default: []
-  }
-})
+<script setup lang="ts">
+import type { Product, Shelf } from '@/types'
+
+const model = defineModel<boolean>()
+defineProps<{
+  products: Product[] | null
+  shelf: Shelf[]
+}>()
 </script>
 
 <template>
@@ -26,7 +24,7 @@ defineProps({
               <v-code>
                 <template v-for="(product, index) in products" :key="index">
                   {{ product }}
-                  <span v-if="index < products.length - 1"><br><br></span>
+                  <span v-if="index < (products?.length ?? 0) - 1"><br><br></span>
                 </template>
               </v-code>
             </v-expansion-panel-text>

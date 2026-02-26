@@ -1,9 +1,9 @@
-<script setup>
-const snackbarModel = defineModel(false)
-const props = defineProps({
-    snackbarColor: {},
-    snackbarText: {},
-  })
+<script setup lang="ts">
+const snackbarModel = defineModel<boolean>()
+const props = defineProps<{
+  snackbarColor: string
+  snackbarText: string | null
+}>()
 </script>
 
 <template>

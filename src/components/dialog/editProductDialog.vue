@@ -1,19 +1,17 @@
-<script setup>
-import {ref} from "vue";
-const model = defineModel()
-const emit = defineEmits(['saveProduct'])
-const form = ref(null)
+<script setup lang="ts">
+import { ref } from "vue";
 
+const model = defineModel<boolean>()
+const emit = defineEmits<{
+  saveProduct: [product: { quantity: string; stackable: boolean }]
+}>()
 const formData = ref({
   quantity: '',
-  stackable: false
+  stackable: false,
+  depth: null as number | null,
 })
 
 function editarProduto () {
-  const produto = {
-    quantity: formData.value.quantity,
-    stackable: formData.value.stackable,
-  }
   reset()
   model.value = false
 }
@@ -26,7 +24,8 @@ function cancel(){
 function reset(){
   formData.value = {
     quantity: '',
-    stackable: false
+    stackable: false,
+    depth: null
   }
 }
 </script>

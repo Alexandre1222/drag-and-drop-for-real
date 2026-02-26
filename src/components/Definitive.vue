@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, onUnmounted, ref, nextTick } from "vue";
 import { useSound } from '@vueuse/sound';
 import AddProductDialog from "@/components/dialog/addProductDialog.vue";
@@ -14,6 +14,33 @@ import decorativeElementDb from '@/plugins/database/decorativeElement.json';
 import cmToPixel from "@/plugins/helper/cmToPixel";
 import { showSnackbar } from "@/plugins/helper/customSnackbar";
 import minecraftClick from '@/assets/sounds/minecraftClick.mp3';
+import type { Shelf, Product, SelectedProduct } from '@/types';
+
+interface ProductItem {
+  label?: string
+  title?: string
+  ean?: string
+  previewUrl?: string
+  icon?: string
+  height?: number
+  width?: number
+  depth?: number
+  color?: string
+  children?: ProductItem[]
+  x?: number
+  y?: number
+  [key: string]: unknown
+}
+
+interface DecorativeItem {
+  title?: string
+  color?: string
+  isPhysical?: boolean
+  width?: number
+  height?: number
+  dimensions?: { width?: number; height?: number; fontSize?: string }
+  [key: string]: unknown
+}
 
 const { play: addProductSound } = useSound(minecraftClick, { volume: 1, interrupt: true });
 
@@ -30,34 +57,32 @@ const editShelfModel = ref(false);
 const importProductModel = ref(false);
 const resultModel = ref(false);
 
-const dragAndDropRef = ref(null);
-const currentShelf = ref(null);
-const shelfIndexToDelete = ref(null);
-const productList = ref(null);
-const decorativeElementList = ref(null);
+const dragAndDropRef = ref<InstanceType<typeof DragAndDropShelf> | null>(null);
+const currentShelf = ref<Shelf | null>(null);
+const shelfIndexToDelete = ref<number | null>(null);
+const productList = ref<ProductItem[] | null>(null);
+const decorativeElementList = ref<DecorativeItem[] | null>(null);
 
-const shelf = ref([
+const shelf = ref<Shelf[]>([
   { mobiliaryElement: 'Prateleira', height: 40, depth: 0, width: 150, tickness: 2, color: '#A3C4BC', products: [] },
   { mobiliaryElement: 'Prateleira', height: 40, depth: 0, width: 150, tickness: 2, color: '#E9C46A', products: [] }
 ]);
-const selectedShelf = ref(null);
-const selectedProduct = ref(null);
+const selectedShelf = ref<number | null>(null);
+const selectedProduct = ref<SelectedProduct | null>(null);
 
-const standSize = ref({ height: 160, width: 92 });
-
-function getShelfMinWidth(index) {
+function getShelfMinWidth(index: number) {
   if (!shelf.value[index]) return 1;
   const physicalProducts = shelf.value[index].products.filter(p => p.isPhysical !== false);
   return physicalProducts.reduce((sum, p) => sum + p.width, 0) || 1;
 }
 
-function getShelfMinHeight(index) {
+function getShelfMinHeight(index: number) {
   if (!shelf.value[index]) return 1;
   const physicalProducts = shelf.value[index].products.filter(p => p.isPhysical !== false);
   return physicalProducts.length > 0 ? Math.max(...physicalProducts.map(p => p.height)) : 1;
 }
 
-function validateShelfDimension(index, field, val) {
+function validateShelfDimension(index: number, field: 'width' | 'height', val: string | number) {
   const newValue = Number(val);
   if (isNaN(newValue) || newValue <= 0) return;
 
@@ -89,7 +114,7 @@ function validateShelfDimension(index, field, val) {
   }
 }
 
-function editShelf(newHeight, index) {
+function editShelf(newHeight: number, index: number) {
   validateShelfDimension(index, 'height', newHeight);
 }
 
@@ -99,7 +124,7 @@ function addShelf() {
   });
 }
 
-function updateProductsPosition(index) {
+function updateProductsPosition(index: number) {
   const currentShelfData = shelf.value[index];
   const shelfHeight = cmToPixel(currentShelfData.height, null).heightPx;
   currentShelfData.products.forEach(product => {
@@ -107,17 +132,18 @@ function updateProductsPosition(index) {
   });
 }
 
-function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
+function canAddProduct(currentShelfProducts: Product[], currentShelfWidth: number, productWidth: number) {
   const widthAccumulated = currentShelfProducts.reduce((acc, p) => acc + p.width, 0);
   return (productWidth + widthAccumulated) > currentShelfWidth;
 }
 
-function addProduct(productItem) {
+function addProduct(productItem: ProductItem) {
   if (productItem.label === 'category') return;
 
   const shelfRef = shelf.value[selectedShelf.value ?? 0];
   const physicalProducts = shelfRef.products.filter(p => p.isPhysical !== false);
-  const { width, height } = productItem;
+  const width = productItem.width ?? 0;
+  const height = productItem.height ?? 0;
 
   if (height > shelfRef.height) {
     return showSnackbar(`O produto tem ${height}cm, mas a prateleira tem apenas ${shelfRef.height}cm de altura.`);
@@ -164,7 +190,7 @@ function addProduct(productItem) {
   });
 }
 
-function addDecorativeElement(item) {
+function addDecorativeElement(item: DecorativeItem) {
   const shelfRef = shelf.value[selectedShelf.value ?? 0];
   const width = item.width ?? item.dimensions?.width ?? 0;
   const height = item.height ?? item.dimensions?.height ?? 0;
@@ -203,7 +229,7 @@ function addDecorativeElement(item) {
   });
 }
 
-const getProductStyle = (imageItem) => {
+const getProductStyle = (imageItem: Product) => {
   const { heightPx, widthPx } = cmToPixel(imageItem.height, imageItem.width);
   return {
     height: `${heightPx}px`,
@@ -212,37 +238,37 @@ const getProductStyle = (imageItem) => {
   };
 };
 
-function saveProduct(product) {
-  product.forEach(p => {
+function saveProduct(product: ProductItem[]) {
+  product.forEach((p: ProductItem) => {
     p.x = 0;
     p.y = 0;
-    productList.value.push(p);
+    productList.value!.push(p);
   });
 }
 
-function saveDecorativeElement(product) {
+function saveDecorativeElement(product: DecorativeItem[]) {
   console.log('Decorative element saved:', product);
-decorativeElementList.value.push(...product);
+  decorativeElementList.value!.push(...product);
 }
 
-function handleKeydown(e) {
+function handleKeydown(e: KeyboardEvent) {
   if (e.ctrlKey && e.key === 'k') {
     e.preventDefault();
     resultModel.value = true;
   }
 }
 
-function doHomeAction(actionMethod) {
-  const actions = {
-    'hide-expansion': () => showExpansion.value = !showExpansion.value,
-    'hide-products': () => showProducts.value = !showProducts.value,
-    'reset-position': () => dragAndDropRef.value?.resetPosition(),
-    'hide-asset': () => showAssets.value = !showAssets.value
+function doHomeAction(actionMethod: string) {
+  const actions: Record<string, () => void> = {
+    'hide-expansion': () => { showExpansion.value = !showExpansion.value },
+    'hide-products': () => { showProducts.value = !showProducts.value },
+    'reset-position': () => { dragAndDropRef.value?.resetPosition() },
+    'hide-asset': () => { showAssets.value = !showAssets.value }
   };
   actions[actionMethod]?.();
 }
 
-function isColorDark(colorHex) {
+function isColorDark(colorHex: string | undefined) {
   if (!colorHex) return false;
   const hex = colorHex.replace('#', '');
   const r = parseInt(hex.substr(0, 2), 16);
@@ -253,8 +279,8 @@ function isColorDark(colorHex) {
 
 onMounted(() => {
   loading.value = true;
-  productList.value = productsDb.items;
-  decorativeElementList.value = decorativeElementDb.items;
+  productList.value = productsDb.items as ProductItem[];
+  decorativeElementList.value = decorativeElementDb.items as DecorativeItem[];
   window.addEventListener('keydown', handleKeydown);
   setTimeout(() => loading.value = false, 2000);
 });
@@ -286,13 +312,13 @@ onUnmounted(() => {
         <v-btn-group density="compact" variant="outlined" class="mr-4">
           <v-btn icon="mdi-restore" title="Resetar Posição" @click="doHomeAction('reset-position')" />
           <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-left"
-            @click.stop="dragAndDropRef?.doFormatAlign('left', selectedShelf)" />
+            @click.stop="dragAndDropRef?.doFormatAlign('left', selectedShelf!)" />
           <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-center"
-            @click.stop="dragAndDropRef?.doFormatAlign('center', selectedShelf)" />
+            @click.stop="dragAndDropRef?.doFormatAlign('center', selectedShelf!)" />
           <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-right"
-            @click.stop="dragAndDropRef?.doFormatAlign('right', selectedShelf)" />
+            @click.stop="dragAndDropRef?.doFormatAlign('right', selectedShelf!)" />
           <v-btn :disabled="selectedShelf == null" icon="mdi-format-align-justify"
-            @click.stop="dragAndDropRef?.doFormatAlign('justify', selectedShelf)" />
+            @click.stop="dragAndDropRef?.doFormatAlign('justify', selectedShelf!)" />
         </v-btn-group>
 
         <v-btn color="success" prepend-icon="mdi-content-save" variant="flat" class="mr-2">Salvar</v-btn>
@@ -508,13 +534,14 @@ onUnmounted(() => {
     </template>
   </v-container>
 
+  <!-- @vue-ignore -->
   <add-product-dialog v-model="addProductModel" @save-product="saveProduct" />
   <add-decorative-element-dialog v-model="addDecorativeModel" @save-decorative-element="saveDecorativeElement" />
   <edit-product-dialog v-model="editProductModel" />
   <edit-shelf-dialog v-model="editShelfModel" :current-shelf="currentShelf" :currentShelfIndex="shelfIndexToDelete"
     @edit-shelf="editShelf" />
-  <import-product-dialog v-model="importProductModel" @update-products="saveProduct" />
-  <result-dialog v-model="resultModel" :products="productList" :shelf="shelf" />
+  <import-product-dialog v-model="importProductModel" @update-products="(products: any[]) => saveProduct(products)" />
+  <result-dialog v-model="resultModel" :products="productList as any" :shelf="shelf" />
 </template>
 
 <style scoped>

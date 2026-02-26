@@ -1,7 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import {computed, onMounted, reactive, ref} from "vue";
 import {useSound} from "@vueuse/sound";
 import Panzoom from '@panzoom/panzoom';
+import type { PanzoomObject } from '@panzoom/panzoom';
 import cmToPixel from "@/plugins/helper/cmToPixel";
 import {stringToColour} from "@/plugins/helper/stringToColour";
 import {showSnackbar} from "@/plugins/helper/customSnackbar";
@@ -9,46 +10,71 @@ import WelcomeDialog from "@/components/dialog/welcomeDialog.vue";
 import bonk from "@/assets/sounds/bonk.mp3";
 import magic from "@/assets/sounds/magic.mp3";
 import mine from "@/assets/sounds/mine.mp3";
+import type { Shelf, Product, SelectedProduct, AlignType } from '@/types';
 
-const props = defineProps({
-  showAssets: {default: false, required: true}
-});
+interface DraggedItem {
+  item: Product
+  index: number
+  shelfIndex: number
+  offsetX: number
+  offsetY: number
+}
 
-const shelf = defineModel("shelf");
-const selectedShelf = defineModel("selectedShelf");
-const selectedProduct = defineModel("selectedProduct");
+interface DragPreviewState {
+  x: number
+  y: number
+  width: number
+  height: number
+  ean: string
+  isPhysical: boolean
+  shape: string
+}
 
-const panzoomRef = ref(null);
+const props = defineProps<{
+  showAssets: boolean
+}>();
+
+interface ShelfMenuState {
+  x: number
+  y: number
+  index: number
+}
+
+const shelf = defineModel<Shelf[]>("shelf", { required: true });
+const selectedShelf = defineModel<number | ShelfMenuState | null>("selectedShelf");
+const selectedProduct = defineModel<SelectedProduct | null>("selectedProduct");
+
+const panzoomRef = ref<PanzoomObject | null>(null);
 const isPanningCanva = ref(false);
 const welcomeDialogRef = ref(false);
-const draggedItem = ref(null);
+const draggedItem = ref<DraggedItem | null>(null);
 const menu = ref(false);
 const shelfMenu = ref(false);
-const menuTarget = ref(null);
-const currentFocus = ref(null);
-const dragShow = ref([]);
-const dragPreview = reactive({x: 0, y: 0, width: 0, height: 0, ean: '', isPhysical: true, shape: 'rectangle'});
+const menuTarget = ref<HTMLElement | null>(null);
+const currentFocus = ref<Product | null>(null);
+const dragShow = ref<boolean[]>([]);
+const dragPreview: DragPreviewState = reactive({x: 0, y: 0, width: 0, height: 0, ean: '', isPhysical: true, shape: 'rectangle'});
 
 const {play: deleteSound} = useSound(bonk, {volume: 0.4, interrupt: true});
 const {play: addMagicSound} = useSound(magic, {volume: 0.5, interrupt: true});
 const {play: deleteShelfSound} = useSound(mine, {volume: 0.5, interrupt: true});
 
-defineExpose({resetPosition, doFormatAlign});
+defineExpose({resetPosition, doFormatAlign} as { resetPosition: () => void; doFormatAlign: (align: AlignType, shelfIndex: number) => void });
 
 const previewStyle = computed(() => ({
   top: `${dragPreview.y}px`,
   left: `${dragPreview.x}px`,
   width: `${dragPreview.width}px`,
   height: `${dragPreview.height}px`,
-  position: 'absolute',
+  position: 'absolute' as const,
   opacity: 0.6,
   border: dragPreview.isPhysical ? '2px solid #000' : '2px dashed #1976D2',
-  pointerEvents: 'none',
+  pointerEvents: 'none' as const,
   borderRadius: dragPreview.shape === 'circle' ? '50%' : dragPreview.shape === 'line' ? '2px' : '4px',
   zIndex: 100,
 }));
 
-const getProductStyle = (imageItem) => {
+const getProductStyle = (imageItem: Product) => {
   console.log('Calculating style for item:', imageItem);
   const {heightPx, widthPx} = cmToPixel(imageItem.height, imageItem.width);
   const hasImage = props.showAssets && imageItem.previewUrl;
@@ -63,7 +89,7 @@ const getProductStyle = (imageItem) => {
   };
 };
 
-const getProductClasses = (imageItem, itemIndex, shelfIndex) => {
+const getProductClasses = (imageItem: Product, itemIndex: number, shelfIndex: number) => {
   const isSelected = selectedProduct.value?.itemIndex === itemIndex && selectedProduct.value?.index === shelfIndex;
   const hasImage = props.showAssets && imageItem.previewUrl;
   return {
@@ -73,7 +99,7 @@ const getProductClasses = (imageItem, itemIndex, shelfIndex) => {
   };
 };
 
-function hasHorizontalCollision(products, indexToIgnore, newX, draggedWidth, isItemPhysical) {
+function hasHorizontalCollision(products: Product[], indexToIgnore: number | Product | null, newX: number, draggedWidth: number, isItemPhysical: boolean) {
   if (!isItemPhysical || !products) return false;
 
   const draggedStart = newX;
@@ -91,37 +117,39 @@ function hasHorizontalCollision(products, indexToIgnore, newX, draggedWidth, isI
   });
 }
 
-function openShelfMenu(shelfIndex, event) {
+function openShelfMenu(shelfIndex: number, event: MouseEvent) {
   menu.value = false;
   selectedShelf.value = {x: event.clientX, y: event.clientY, index: shelfIndex};
   shelfMenu.value = true;
 }
 
-function actionShelf(method) {
-  if (method === 'delete') {
-    shelf.value.splice(selectedShelf.value.index, 1);
+function actionShelf(method: string) {
+  const shelfState = selectedShelf.value as ShelfMenuState | null;
+  if (method === 'delete' && shelfState) {
+    shelf.value!.splice(shelfState.index, 1);
     shelfMenu.value = false;
-    if (selectedProduct.value && selectedShelf.value.index === selectedProduct.value.index) {
+    if (selectedProduct.value && shelfState.index === selectedProduct.value.index) {
       selectedProduct.value = null;
     }
     deleteShelfSound();
   }
 }
 
-function openMenu(index, shelfIndex, event) {
+function openMenu(index: number, shelfIndex: number, event: MouseEvent) {
   shelfMenu.value = false;
-  draggedItem.value = {index, shelfIndex};
-  menuTarget.value = event.target.closest('.menuContext');
+  draggedItem.value = {index, shelfIndex} as DraggedItem;
+  menuTarget.value = (event.target as HTMLElement)?.closest('.menuContext') as HTMLElement | null;
   menu.value = true;
 }
 
-function action(method) {
+function action(method: string) {
+  if (!draggedItem.value || !shelf.value) return;
   const shelfIdx = draggedItem.value.shelfIndex;
   const pIdx = draggedItem.value.index;
-  const product = shelf.value[shelfIdx].products[pIdx];
+  const product = shelf.value![shelfIdx].products[pIdx];
 
   if (method === "delete") {
-    shelf.value[shelfIdx].products.splice(pIdx, 1);
+    shelf.value![shelfIdx].products.splice(pIdx, 1);
     menu.value = false;
     selectedProduct.value = null;
     deleteSound();
@@ -131,16 +159,16 @@ function action(method) {
   }
 }
 
-function canAddProduct(currentShelfProducts, currentShelfWidth, productWidth) {
+function canAddProduct(currentShelfProducts: Product[], currentShelfWidth: number, productWidth: number) {
   const widthAccumulated = currentShelfProducts.reduce((acc, p) => acc + (p.isPhysical ? p.width : 0), 0);
   return (productWidth + widthAccumulated) > currentShelfWidth;
 }
 
-function onDragStart(item, itemIndex, shelfIndex, event) {
-  const element = event.target.closest('.image-item') || event.target;
-  const rect = element.getBoundingClientRect();
+function onDragStart(item: Product, itemIndex: number, shelfIndex: number, event: DragEvent) {
+  const element = (event.target as HTMLElement).closest('.image-item') || event.target as HTMLElement;
+  const rect = (element as HTMLElement).getBoundingClientRect();
   const {widthPx, heightPx} = cmToPixel(item.height, item.width);
-  const currentScale = panzoomRef.value.getScale();
+  const currentScale = panzoomRef.value!.getScale();
 
   dragShow.value[shelfIndex] = true;
   dragPreview.width = widthPx;
@@ -159,14 +187,14 @@ function onDragStart(item, itemIndex, shelfIndex, event) {
 
   const img = new Image();
   img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-  event.dataTransfer.setDragImage(img, 0, 0);
-  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer!.setDragImage(img, 0, 0);
+  event.dataTransfer!.effectAllowed = 'move';
 }
 
-function doFormatAlign(align, shelfIndex) {
+function doFormatAlign(align: AlignType, shelfIndex: number) {
   addMagicSound();
-  const currentShelf = shelf.value[shelfIndex];
-  const shelfWidth = cmToPixel(null, shelf.value[shelfIndex].width).widthPx;
+  const currentShelf = shelf.value![shelfIndex];
+  const shelfWidth = cmToPixel(null, shelf.value![shelfIndex].width).widthPx;
   const physicalProducts = currentShelf.products.filter(p => p.isPhysical !== false);
   const sortedProducts = [...physicalProducts].sort((a, b) => a.x - b.x);
 
@@ -196,12 +224,12 @@ function doFormatAlign(align, shelfIndex) {
   });
 }
 
-function onDrop(index, event, shelfHeight = 0) {
-  if (!draggedItem.value.item) return;
+function onDrop(index: number, event: DragEvent, shelfHeight: number = 0) {
+  if (!draggedItem.value?.item) return;
 
   const sourceIndex = draggedItem.value.shelfIndex;
-  const sourceShelf = shelf.value[sourceIndex];
-  const destShelf = shelf.value[index];
+  const sourceShelf = shelf.value![sourceIndex];
+  const destShelf = shelf.value![index];
   const draggedIndex = draggedItem.value.index;
   const draggedProduct = sourceShelf.products[draggedIndex];
   const isPhysical = draggedProduct.isPhysical !== false;
@@ -217,9 +245,9 @@ function onDrop(index, event, shelfHeight = 0) {
     }
   }
 
-  const container = event.currentTarget;
+  const container = event.currentTarget as HTMLElement;
   const containerRect = container.getBoundingClientRect();
-  const currentScale = panzoomRef.value.getScale();
+  const currentScale = panzoomRef.value!.getScale();
   const mouseRelX = (event.clientX - containerRect.left) / currentScale;
   const finalX = mouseRelX - draggedItem.value.offsetX;
 
@@ -252,60 +280,60 @@ function onDrop(index, event, shelfHeight = 0) {
 }
 
 function onDragEnd() {
-  draggedItem.value = {item: null, index: null, shelfIndex: null};
+  draggedItem.value = null;
   dragShow.value = [];
 }
 
-const onDragOver = (event, shelfHeight, shelfIndex) => {
+const onDragOver = (event: DragEvent, shelfHeight: number, shelfIndex: number) => {
   if (!dragShow.value[shelfIndex]) {
-    const newShowState = new Array(shelf.value.length).fill(false);
+    const newShowState = new Array(shelf.value!.length).fill(false) as boolean[];
     newShowState[shelfIndex] = true;
     dragShow.value = newShowState;
   }
 
-  const destShelf = shelf.value[shelfIndex];
-  const container = event.currentTarget;
+  const destShelf = shelf.value![shelfIndex];
+  const container = event.currentTarget as HTMLElement;
   const rect = container.getBoundingClientRect();
-  const currentScale = panzoomRef.value.getScale();
+  const currentScale = panzoomRef.value!.getScale();
 
   const mouseRelX = (event.clientX - rect.left) / currentScale;
   const mouseRelY = (event.clientY - rect.top) / currentScale;
 
-  dragPreview.x = mouseRelX - draggedItem.value.offsetX;
+  dragPreview.x = mouseRelX - draggedItem.value!.offsetX;
 
   if (dragPreview.isPhysical) {
     dragPreview.y = shelfHeight - dragPreview.height;
   } else {
-    dragPreview.y = mouseRelY - draggedItem.value.offsetY;
+    dragPreview.y = mouseRelY - draggedItem.value!.offsetY;
   }
-  const draggedWidthPx = cmToPixel(null, draggedItem.value.item.width).widthPx
-  const collision = hasHorizontalCollision(destShelf.products, draggedItem.value.index, dragPreview.x, draggedWidthPx, dragPreview.isPhysical);
-  previewStyle.value.backgroundColor = collision ? "#ff2c2c" : stringToColour(dragPreview.ean);
-  previewStyle.value.borderRadius = dragPreview.shape === 'circle' ? '50%' : '4px';
+  const draggedWidthPx = cmToPixel(null, draggedItem.value!.item.width).widthPx
+  const collision = hasHorizontalCollision(destShelf.products, draggedItem.value!.index, dragPreview.x, draggedWidthPx, dragPreview.isPhysical);
+  (previewStyle.value as Record<string, unknown>).backgroundColor = collision ? "#ff2c2c" : stringToColour(dragPreview.ean);
+  (previewStyle.value as Record<string, unknown>).borderRadius = dragPreview.shape === 'circle' ? '50%' : '4px';
   console.log('Drag preview style:', previewStyle.value);
 };
 
-function onFocus(currentImage) { currentFocus.value = currentImage; }
+function onFocus(currentImage: Product) { currentFocus.value = currentImage; }
 function onFocusOut() { currentFocus.value = null; }
 
-function onMouseDown(event) {
+function onMouseDown(event: MouseEvent) {
   if (event.button === 1) {
     isPanningCanva.value = true;
-    panzoomRef.value.setOptions({disablePan: true});
+    panzoomRef.value!.setOptions({disablePan: true});
   }
 }
 
 function onMouseLeave() {
   isPanningCanva.value = false;
-  panzoomRef.value.setOptions({disablePan: false});
+  panzoomRef.value!.setOptions({disablePan: false});
 }
 
-function resetPosition() { panzoomRef.value.reset(); }
+function resetPosition() { panzoomRef.value!.reset(); }
 
 onMounted(() => {
-  const elem = document.getElementById('canvas');
+  const elem = document.getElementById('canvas')!;
   panzoomRef.value = Panzoom(elem, {maxScale: 5, excludeClass: 'exclude-area'});
-  elem.parentElement.addEventListener('wheel', panzoomRef.value.zoomWithWheel);
+  elem.parentElement!.addEventListener('wheel', panzoomRef.value.zoomWithWheel);
 });
 </script>
 
@@ -322,7 +350,7 @@ onMounted(() => {
 
           <div v-if="dragShow[index]" :style="previewStyle"></div>
 
-          <v-menu v-model="shelfMenu" :target="[selectedShelf?.x ?? 0, selectedShelf?.y ?? 0]" close-on-back close-on-content-click location="end">
+          <v-menu v-model="shelfMenu" :target="[(selectedShelf as ShelfMenuState)?.x ?? 0, (selectedShelf as ShelfMenuState)?.y ?? 0]" close-on-back close-on-content-click location="end">
             <v-list class="py-0" density="compact" nav slim>
               <v-list-item density="compact" @click="actionShelf('edit')"><v-list-item-title>Editar Prateleira</v-list-item-title></v-list-item>
               <v-list-item density="compact" @click="actionShelf('delete')"><v-list-item-title>Deletar Prateleira</v-list-item-title></v-list-item>
@@ -349,12 +377,12 @@ onMounted(() => {
             </div>
           </div>
 
-          <v-menu v-model="menu" :target="menuTarget" close-on-back close-on-content-click location="end">
+          <v-menu v-model="menu" :target="menuTarget ?? undefined" close-on-back close-on-content-click location="end">
             <v-list class="py-0" density="compact" nav slim>
               <v-list-item density="compact" @click="action('togglePhysics')">
                 <v-list-item-title class="d-flex align-center">
-                  <v-icon :icon="shelf[draggedItem?.shelfIndex]?.products[draggedItem?.index]?.isPhysical ? 'mdi-cube-outline' : 'mdi-ghost'" class="mr-2" size="small"></v-icon>
-                  {{ shelf[draggedItem?.shelfIndex]?.products[draggedItem?.index]?.isPhysical ? 'Tornar Decorativo' : 'Tornar Físico' }}
+                  <v-icon :icon="shelf![draggedItem?.shelfIndex ?? 0]?.products[draggedItem?.index ?? 0]?.isPhysical ? 'mdi-cube-outline' : 'mdi-ghost'" class="mr-2" size="small"></v-icon>
+                  {{ shelf![draggedItem?.shelfIndex ?? 0]?.products[draggedItem?.index ?? 0]?.isPhysical ? 'Tornar Decorativo' : 'Tornar Físico' }}
                 </v-list-item-title>
               </v-list-item>
               <v-list-item density="compact" @click="action('edit')"><v-list-item-title>Editar</v-list-item-title></v-list-item>

@@ -1,17 +1,9 @@
-<script setup>
-import {onMounted, reactive} from "vue";
+<script setup lang="ts">
+import { onMounted, reactive } from "vue";
 import oldMan from '@/assets/planoghini.png'
 import gsap from "gsap";
 
-const model = defineModel()
-defineProps({
-  products: {
-    default: []
-  },
-  shelf: {
-    default: []
-  }
-})
+const model = defineModel<boolean>()
 
 const tweened = reactive({
   number: 0

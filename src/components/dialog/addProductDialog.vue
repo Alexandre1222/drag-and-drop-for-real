@@ -1,16 +1,17 @@
-<script setup>
-import {ref} from "vue";
-const model = defineModel()
-const emit = defineEmits(['saveProduct'])
-const form = ref(null)
+<script setup lang="ts">
+import { ref } from "vue";
 
+const model = defineModel<boolean>()
+const emit = defineEmits<{
+  saveProduct: [products: Array<{ title: string; previewUrl: string; sku: string; height: number | null; width: number | null; depth: number | null }>]
+}>()
 const formData = ref({
   title: '',
   previewUrl: '',
   sku: '',
-  height: null,
-  width: null,
-  depth: null
+  height: null as number | null,
+  width: null as number | null,
+  depth: null as number | null,
 })
 
 function salvarProduto () {

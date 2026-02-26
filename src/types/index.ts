@@ -12,6 +12,7 @@ export interface Product {
   isPhysical: boolean
   type?: 'decorative'
   shape?: 'circle' | 'rectangle' | 'line'
+  label?: string
   position?: number
   quantity?: number
   stackable?: boolean
@@ -20,6 +21,7 @@ export interface Product {
   borderColor?: string
   text?: string
   fontSize?: number
+  dimensions?: { width?: number; height?: number; fontSize?: string }
 }
 
 export interface Shelf {

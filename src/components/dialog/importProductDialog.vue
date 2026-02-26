@@ -1,13 +1,20 @@
-<script setup>
-import {ref} from "vue";
+<script setup lang="ts">
+import { ref } from "vue";
 import * as Excel from "exceljs";
-const model = defineModel()
-const emit = defineEmits(['updateProducts'])
-const form = ref(null)
-const productExcel = ref(null)
-const extractedProducts = ref([])
-const tableHeader = ref([])
-const headerTranslateMap = {
+
+interface TableHeader {
+  title: string
+  value: string
+}
+
+const model = defineModel<boolean>()
+const emit = defineEmits<{
+  updateProducts: [products: Record<string, unknown>[]]
+}>()
+const productExcel = ref<File | null>(null)
+const extractedProducts = ref<Record<string, unknown>[]>([])
+const tableHeader = ref<TableHeader[]>([])
+const headerTranslateMap: Record<string, string> = {
   'nome': 'name',
   'marca': 'brand',
   'categoria': 'category',
@@ -16,11 +23,12 @@ const headerTranslateMap = {
   'largura': 'width',
   'profundidade': 'depth',
 }
-function stripedRows(row){
+function stripedRows(row: { index: number }) {
   return row.index % 2 === 0 ? {class: 'bg-blue-grey-lighten-5'} : {}
 }
 
-async function doImportProduct(excelFile) {
+async function doImportProduct(excelFile: File | File[] | null) {
+  if (!excelFile || Array.isArray(excelFile)) return;
   const workbook = new Excel.Workbook()
   const buffer = await excelFile.arrayBuffer()
 
@@ -57,7 +65,7 @@ async function doImportProduct(excelFile) {
     }
 
     // LINHAS
-    const rowData = {}
+    const rowData: Record<string, unknown> = {}
 
     row.eachCell((cell, colNumber) => {
       const headerKey = tableHeader.value[colNumber - 1]?.value
